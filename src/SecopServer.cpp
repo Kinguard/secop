@@ -76,29 +76,35 @@ SecopServer::Dispatch ( SocketPtr con )
 	size_t rd;
 	Json::Value session;
 	session["user"]["authenticated"]=false;
-	while( (rd = sock->Read(buf, sizeof(buf))) > 0 )
+	try
 	{
-		logg << "Read request of socket"<<lend;
-		Json::Value req;
-		if( reader.parse(buf, req) )
+		while( (rd = sock->Read(buf, sizeof(buf))) > 0 )
 		{
-			if( req.isMember("cmd") && req["cmd"].isString() )
+			logg << "Read request of socket"<<lend;
+			Json::Value req;
+			if( reader.parse(buf, req) )
 			{
-				this->ProcessOneCommand(sock, req, session);
+				if( req.isMember("cmd") && req["cmd"].isString() )
+				{
+					this->ProcessOneCommand(sock, req, session);
+				}
+				else
+				{
+					this->SendErrorMessage(sock, Json::Value::null, 4, "Missing command in request");
+					break;
+				}
 			}
 			else
 			{
-				this->SendErrorMessage(sock, Json::Value::null, 4, "Missing command in request");
+				this->SendErrorMessage(sock, Json::Value::null, 4, "Unable to parse request");
 				break;
 			}
 		}
-		else
-		{
-			this->SendErrorMessage(sock, Json::Value::null, 4, "Unable to parse request");
-			break;
-		}
 	}
-
+	catch(Utils::ErrnoException& e)
+	{
+		logg << Logger::Debug << "Caught exception on socket read ("<<e.what()<<")"<<lend;
+	}
 
 	this->decreq();
 }

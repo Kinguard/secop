@@ -8,6 +8,7 @@
 #ifndef SECOPSERVER_H_
 #define SECOPSERVER_H_
 
+#include <memory>
 #include <string>
 #include <map>
 
@@ -90,5 +91,7 @@ private:
 	typedef void (SecopServer::*Action)(UnixStreamClientSocketPtr&, Json::Value&, Json::Value&);
 	map<string,pair<unsigned char, Action>> actions;
 };
+
+typedef std::shared_ptr<SecopServer> SecopServerPtr;
 
 #endif /* SECOPSERVER_H_ */
