@@ -70,6 +70,76 @@ class TestSecop(TestBase):
 		(status, res) = self.s.status()
 		self.assertEqual( res["server"]["state"], 2)
 
+	def test_3_user(self):
+		# Initialise db
+		(status, res) = self.s.init("Secret password")
+		self.assertTrue( status )
+		self.assertEqual( res["status"]["value"], 0)
+		# Add one user
+		(status, res) = self.s.adduser("user","secret")
+		self.assertTrue( status )
+		self.assertEqual( res["status"]["value"], 0)
+		# Try adding it again
+		(status, res) = self.s.adduser("user","secret")
+		self.assertFalse( status )
+		# remove user
+		(status, res) = self.s.removeuser("user")
+		self.assertTrue( status )
+		# Add one user
+		(status, res) = self.s.adduser("user","secret")
+		self.assertTrue( status )
+		# Add one user
+		(status, res) = self.s.adduser("user2","secret2")
+		self.assertTrue( status )
+		# Get users
+		(status, res) = self.s.getusers()
+		self.assertTrue( status )
+		self.assertEqual( len(res["users"]),2)
+		# remove user
+		(status, res) = self.s.removeuser("user2")
+		self.assertTrue( status )
+		# Get users
+		(status, res) = self.s.getusers()
+		self.assertTrue( status )
+		self.assertEqual( len(res["users"]),1)
+
+	def test_4_services(self):
+		# Initialise db
+		(status, res) = self.s.init("Secret password")
+		self.assertTrue( status )
+		self.assertEqual( res["status"]["value"], 0)
+		# Add one user
+		(status, res) = self.s.adduser("user","secret")
+		self.assertTrue( status )
+		self.assertEqual( res["status"]["value"], 0)
+		#Get services
+		(status, res) = self.s.getservices("user")
+		self.assertTrue( status )
+		self.assertEqual( len(res["services"]), 1)
+		# Add service
+		(status, res) = self.s.addservice("user","myservice")
+		self.assertTrue( status )
+		#Get services
+		(status, res) = self.s.getservices("user")
+		self.assertEqual( len(res["services"]), 2)
+		#Remove service
+		(status, res) = self.s.removeservice("user","myservice")
+		self.assertTrue( status )
+		#Get services
+		(status, res) = self.s.getservices("user")
+		self.assertEqual( len(res["services"]), 1)
+
+	def test_5_identifiers(self):
+		# Initialise db
+		(status, res) = self.s.init("Secret password")
+		# Add one user
+		(status, res) = self.s.adduser("user","secret")
+		# Add service
+		(status, res) = self.s.addservice("user","myservice")
+		# Get identifiers
+		(status, res) = self.s.getidentifiers("user","myservice")
+		self.assertTrue( status )
+
 if __name__=='__main__':
 	print "Start"
 	unittest.main()
