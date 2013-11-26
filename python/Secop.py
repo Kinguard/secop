@@ -99,11 +99,27 @@ class Secop(Client):
 		req["servicename"] = service
 		return self._dorequest(req,dump)
 
+	def addidentifier(self, user, service, identifier, dump=defaultdump):
+		req = {}
+		req["cmd"]="addidentifier"
+		req["username"] = user
+		req["servicename"] = service
+		req["identifier"] = identifier
+		return self._dorequest(req,dump)
+
+	def removeidentifier(self, user, service, identifier, dump=defaultdump):
+		req = {}
+		req["cmd"]="removeidentifier"
+		req["username"] = user
+		req["servicename"] = service
+		req["identifier"] = identifier
+		return self._dorequest(req,dump)
+
 	def getidentifiers(self, user, service, dump=defaultdump):
 		req = {}
-		req["cmd"]="getservices"
-		req["user"] = user
-		req["service"] = service
+		req["cmd"]="getidentifiers"
+		req["username"] = user
+		req["servicename"] = service
 		return self._dorequest(req,dump)
 		
 

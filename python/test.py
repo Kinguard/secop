@@ -139,6 +139,49 @@ class TestSecop(TestBase):
 		# Get identifiers
 		(status, res) = self.s.getidentifiers("user","myservice")
 		self.assertTrue( status )
+		self.assertEqual( len(res["identifiers"]), 0)
+		# Add identifier
+		id = {}
+		id["user"]="user"
+		id["password"] = "S3cret"
+		id["service"] = "http://www.hotmail.com"
+		id["comment"] = "A test"
+		(status, res) = self.s.addidentifier("user","myservice", id)
+		self.assertTrue( status )
+		# Get identifiers
+		(status, res) = self.s.getidentifiers("user","myservice")
+		self.assertTrue( status )
+		self.assertEqual( len(res["identifiers"]), 1)
+		# Remove identifier
+		(status, res) = self.s.removeidentifier("user","myservice", id)
+		self.assertTrue( status )
+		# Get identifiers
+		(status, res) = self.s.getidentifiers("user","myservice")
+		self.assertTrue( status )
+		self.assertEqual( len(res["identifiers"]), 0)
+		# Add identifiers
+		(status, res) = self.s.addidentifier("user","myservice", id)
+		id2 = {}
+		id2["user"]="user"
+		id2["password"] = "S3cret"
+		id2["service"] = "http://live.com"
+		id2["comment"] = "A test"
+		(status, res) = self.s.addidentifier("user","myservice", id2)
+		# Get identifiers
+		(status, res) = self.s.getidentifiers("user","myservice")
+		self.assertEqual( len(res["identifiers"]), 2)
+		# Remove identifier
+		(status, res) = self.s.removeidentifier("user","myservice", id)
+		self.assertTrue( status )
+		# Get identifiers
+		(status, res) = self.s.getidentifiers("user","myservice")
+		self.assertEqual( len(res["identifiers"]), 1)
+		# Remove identifier
+		(status, res) = self.s.removeidentifier("user","myservice", id2)
+		self.assertTrue( status )
+		# Get identifiers
+		(status, res) = self.s.getidentifiers("user","myservice")
+		self.assertEqual( len(res["identifiers"]), 0)
 
 if __name__=='__main__':
 	print "Start"

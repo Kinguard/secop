@@ -72,6 +72,8 @@ protected:
 	void DoHasACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 
 	void DoGetIdentifiers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 
 private:
 	bool CheckArguments(UnixStreamClientSocketPtr& client, int what,const Json::Value& cmd);

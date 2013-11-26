@@ -61,6 +61,8 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 	this->actions["hasacl"]=make_pair(INITIALIZED, &SecopServer::DoHasACL );
 
 
+	this->actions["addidentifier"]=make_pair(INITIALIZED, &SecopServer::DoAddIdentifier );
+	this->actions["removeidentifier"]=make_pair(INITIALIZED, &SecopServer::DoRemoveIdentifier );
 	this->actions["getidentifiers"]=make_pair(INITIALIZED, &SecopServer::DoGetIdentifiers );
 }
 
@@ -732,6 +734,139 @@ SecopServer::DoHasACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 	ret["hasacl"] = this->store->HasACL(user, service, acl);
 
 	this->SendOK(client, cmd, ret);
+}
+
+void
+SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
+{
+	//TODO: Access control!
+
+	ScopedLog l("Add identifier");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR | CHK_SRV, cmd) )
+	{
+		return;
+	}
+
+	string user = cmd["username"].asString();
+	string service = cmd["servicename"].asString();
+
+	if( ! this->store->HasUser(user) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "User unknown");
+		return;
+	}
+
+	if( !this->store->HasService(user,service) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "Service unknown");
+		return;
+	}
+
+	if( !cmd.isMember("identifier") || !cmd["identifier"].isObject() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
+		return;
+	}
+
+	this->store->AddIdentifier(user, service, cmd["identifier"]);
+
+	this->SendOK(client, cmd);
+}
+
+void
+SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
+{
+	//TODO: Access control!
+
+	ScopedLog l("Remove identifier");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR | CHK_SRV, cmd) )
+	{
+		return;
+	}
+
+	string user = cmd["username"].asString();
+	string service = cmd["servicename"].asString();
+
+	if( ! this->store->HasUser(user) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "User unknown");
+		return;
+	}
+
+	if( !this->store->HasService(user,service) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "Service unknown");
+		return;
+	}
+
+	if( !cmd.isMember("identifier") || !cmd["identifier"].isObject() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
+		return;
+	}
+
+	bool id_hasname = false, id_hasservice = false;
+	string id_name, id_service;
+
+	if( cmd["identifier"].isMember("user") && cmd["identifier"]["user"].isString() )
+	{
+		id_hasname = true;
+		id_name = cmd["identifier"]["user"].asString();
+	}
+
+	if( cmd["identifier"].isMember("service") && cmd["identifier"]["service"].isString() )
+	{
+		id_hasservice = true;
+		id_service = cmd["identifier"]["service"].asString();
+	}
+
+	if( !id_hasname && !id_hasservice )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
+		return;
+	}
+
+	Json::Value ids = this->store->GetIdentifiers(user, service);
+	Json::Value new_ids(Json::arrayValue);
+	for( auto id: ids)
+	{
+		bool match_user = false, match_service=false;
+
+		if( id.isMember("user") && id["user"].isString() && id_hasname )
+		{
+			match_user = ( id["user"].asString() == id_name );
+		}
+
+		if( id.isMember("service") && id["service"].isString() && id_hasservice )
+		{
+			match_service = ( id["service"].asString() == id_service );
+		}
+
+		// Todo: there has to be a more clever way
+		if( id_hasname && id_hasservice && match_user && match_service )
+		{
+			continue;
+		}
+		else if( id_hasname && !id_hasservice && match_user)
+		{
+			continue;
+		}
+		else if( ! id_hasname && id_hasservice && match_service )
+		{
+			continue;
+		}
+		else
+		{
+			// Not found, append to new list
+			new_ids.append( id );
+		}
+	}
+
+	this->store->UpdateIdentifiers(user, service, new_ids);
+
+	this->SendOK(client, cmd);
 }
 
 
