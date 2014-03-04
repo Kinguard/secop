@@ -1,0 +1,16 @@
+Source: secop
+Section: admin
+Priority: extra
+Maintainer: Tor Krill <tor@openproducts.se>
+Build-Depends: debhelper (>= 8.0.0), cmake, 
+  libutils-dev, 
+  libcrypto++-dev,
+  libjsoncpp-dev,
+  libcppunit-dev
+Standards-Version: 3.9.4
+Homepage: http://www.openproducts.se
+
+Package: secop
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: OP security application 

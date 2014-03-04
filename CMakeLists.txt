@@ -38,4 +38,4 @@ target_link_libraries( secop applib ${LIBUTILS_LDFLAGS})
 enable_testing()
 add_test( NAME TestSecop COMMAND testsecop )
 
-
+install( TARGETS secop DESTINATION sbin )
