@@ -3,8 +3,9 @@ project( secop )
 
 include( FindPkgConfig )
 
-pkg_check_modules ( LIBCRYPTO++ libcrypto++>=5.6.1 )
-pkg_check_modules ( LIBUTILS libutils>=1.0 )
+pkg_check_modules ( LIBCRYPTO++ REQUIRED libcrypto++>=5.6.1 )
+pkg_check_modules ( LIBUTILS REQUIRED libutils>=1.0 )
+pkg_check_modules ( LIBJSONCPP REQUIRED libjsoncpp>=1.0 )
 
 set (SECOP_VERSION_MAJOR 1)
 set (SECOP_VERSION_MINOR 0)
@@ -16,7 +17,6 @@ configure_file (
 )
 include_directories("${PROJECT_BINARY_DIR}")
 
-add_subdirectory( jsoncpp )
 add_subdirectory( src )
 add_subdirectory( test )
 
@@ -26,7 +26,7 @@ set( secop_src
 
 include_directories (
 	"${PROJECT_SOURCE_DIR}/src"
-	"${PROJECT_SOURCE_DIR}/jsoncpp"
+	"${LIBJSONCPP_INCLUDE_DIRS}"
 	)
 
 add_definitions( -std=c++11 )

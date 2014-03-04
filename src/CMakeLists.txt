@@ -4,7 +4,7 @@ set( applib_src
 	SecopServer.cpp
 	)
 
-include_directories ( "${PROJECT_SOURCE_DIR}/jsoncpp" )
+include_directories ( "${LIBJSONCPP_INCLUDE_DIRS}" )
 add_definitions( -std=c++11 )
 add_library(applib ${applib_src})
 

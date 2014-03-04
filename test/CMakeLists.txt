@@ -8,7 +8,7 @@ set( testsecop_src
 
 include_directories(
     "${PROJECT_SOURCE_DIR}/src"
-    "${PROJECT_SOURCE_DIR}/jsoncpp"
+    "${LIBJSONCPP_INCLUDE_DIRS}"
 )
 
 add_definitions( -std=c++11 )
