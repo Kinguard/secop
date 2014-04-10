@@ -6,8 +6,9 @@ import os
 import sys
 import time
 
+# Todo, find better user for this
 conf = {
-	"exe":"../../kryptoapp-build/secop",
+	"exe":["../../secop-build/secop","-u", "tor", "-g", "tor"],
 	"sock":"/tmp/secop",
 	"db":"/tmp/secop.db"
 }
@@ -24,7 +25,7 @@ def waitfile(file):
 
 class TestBase(unittest.TestCase):
 	def _start(self):
-		self.p = Popen([conf["exe"]])
+		self.p = Popen(conf["exe"])
 		waitfile(conf["sock"])
 		self.s = Secop()
 
