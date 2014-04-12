@@ -76,6 +76,18 @@ class TestSecop(TestBase):
 		(status, res) = self.s.init("Secret password")
 		self.assertTrue( status )
 		self.assertEqual( res["status"]["value"], 0)
+		# Add one user in wrong state
+		(status, res) = self.s.adduser("user","secret")
+		self.assertFalse( status )
+
+		#Authenticate
+		(status, res) = self.s.sockauth()
+		self.assertTrue( status )
+
+		#Check status
+		(status, res) = self.s.status()
+		self.assertTrue( status )
+
 		# Add one user
 		(status, res) = self.s.adduser("user","secret")
 		self.assertTrue( status )
@@ -109,6 +121,11 @@ class TestSecop(TestBase):
 		(status, res) = self.s.init("Secret password")
 		self.assertTrue( status )
 		self.assertEqual( res["status"]["value"], 0)
+
+		#Authenticate
+		(status, res) = self.s.sockauth()
+		self.assertTrue( status )
+
 		# Add one user
 		(status, res) = self.s.adduser("user","secret")
 		self.assertTrue( status )
@@ -133,6 +150,9 @@ class TestSecop(TestBase):
 	def test_5_identifiers(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
+		#Authenticate
+		(status, res) = self.s.sockauth()
+		self.assertTrue( status )
 		# Add one user
 		(status, res) = self.s.adduser("user","secret")
 		# Add service
@@ -183,6 +203,78 @@ class TestSecop(TestBase):
 		# Get identifiers
 		(status, res) = self.s.getidentifiers("user","myservice")
 		self.assertEqual( len(res["identifiers"]), 0)
+		# Remove service
+		(status, res) = self.s.removeservice("user","myservice")
+		self.assertTrue( status )
+		# Remove user		
+		(status, res) = self.s.removeuser("user")
+		self.assertTrue( status )
+
+	def test_6_acl(self):
+		# Initialise db
+		(status, res) = self.s.init("Secret password")
+		#Authenticate
+		(status, res) = self.s.sockauth()
+		self.assertTrue( status )
+		# Add one user
+		(status, res) = self.s.adduser("user","secret")
+		self.assertTrue( status )
+		# Add service
+		(status, res) = self.s.addservice("user","myservice")
+		self.assertTrue( status )
+		#Get ACL
+		(status, res) = self.s.getacl("user","myservice")
+		self.assertTrue( status )
+		self.assertEqual( len(res["acl"]), 0 )
+		#Has ACL
+		(status, res) = self.s.hasacl("user","myservice","acl1")
+		self.assertTrue( status )
+		self.assertFalse( res["hasacl"] )
+		#Add ACL
+		(status, res) = self.s.addacl("user","myservice","acl1")
+		self.assertTrue( status )
+		#Has ACL
+		(status, res) = self.s.hasacl("user","myservice","acl1")
+		self.assertTrue( status )
+		self.assertTrue( res["hasacl"] )
+		#Get ACL
+		(status, res) = self.s.getacl("user","myservice")
+		self.assertTrue( status )
+		self.assertEqual( len(res["acl"]), 1 )
+		self.assertEqual( res["acl"][0], "acl1")
+		#Add same ACL
+		(status, res) = self.s.addacl("user","myservice","acl1")
+		self.assertFalse( status )
+		#Add ACL
+		(status, res) = self.s.addacl("user","myservice","acl2")
+		self.assertTrue( status )
+		#Has ACL
+		(status, res) = self.s.hasacl("user","myservice","acl1")
+		self.assertTrue( status )
+		self.assertTrue( res["hasacl"] )
+		(status, res) = self.s.hasacl("user","myservice","acl2")
+		self.assertTrue( status )
+		self.assertTrue( res["hasacl"] )
+		#Get ACL
+		(status, res) = self.s.getacl("user","myservice")
+		self.assertTrue( status )
+		self.assertEqual( len(res["acl"]), 2 )
+		#Remove ACL
+		(status, res) = self.s.removeacl("user","myservice","acl2")
+		self.assertTrue( status )
+		(status, res) = self.s.hasacl("user","myservice","acl2")
+		self.assertTrue( status )
+		self.assertFalse( res["hasacl"] )
+		#Get ACL
+		(status, res) = self.s.getacl("user","myservice")
+		self.assertTrue( status )
+		self.assertEqual( len(res["acl"]), 1 )
+		# Remove service
+		(status, res) = self.s.removeservice("user","myservice")
+		self.assertTrue( status )
+		# Remove user		
+		(status, res) = self.s.removeuser("user")
+		self.assertTrue( status )
 
 if __name__=='__main__':
 	print "Start"

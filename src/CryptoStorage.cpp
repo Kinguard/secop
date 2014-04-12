@@ -254,12 +254,33 @@ CryptoStorage::RemoveAcl(const string &username, const string &service, const st
 }
 
 bool
+CryptoStorage::ACLEmpty(const string &username, const string &service)
+{
+	if( ! this->HasUser(username)  )
+	{
+		throw std::runtime_error("User unknown");
+	}
+
+	if( ! this->HasService( username, service ) )
+	{
+		throw std::runtime_error("Service not found for user");
+	}
+
+	if( ! this->data["user"][username][service].isMember("acl") || ! this->data["user"][username][service]["acl"].isArray() )
+	{
+		throw std::runtime_error("Malformed syntax in storage");
+	}
+
+	return this->data["user"][username][service]["acl"].size() == 0;
+}
+
+bool
 CryptoStorage::HasACL(const string &username, const string &service, const string &entity)
 {
 
 	if( ! this->HasUser(username)  )
 	{
-		throw std::runtime_error("User unknown in remove service");
+		throw std::runtime_error("User unknown");
 	}
 
 	if( ! this->HasService( username, service ) )

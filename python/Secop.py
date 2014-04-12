@@ -99,6 +99,37 @@ class Secop(Client):
 		req["servicename"] = service
 		return self._dorequest(req,dump)
 
+	def getacl(self, user, service,dump=defaultdump):
+		req = {}
+		req["cmd"]="getacl"
+		req["username"] = user
+		req["servicename"] = service
+		return self._dorequest(req,dump)
+
+	def addacl(self, user, service, acl, dump=defaultdump):
+		req = {}
+		req["cmd"]="addacl"
+		req["username"] = user
+		req["servicename"] = service
+		req["acl"] = acl
+		return self._dorequest(req,dump)
+
+	def removeacl(self, user, service, acl, dump=defaultdump):
+		req = {}
+		req["cmd"]="removeacl"
+		req["username"] = user
+		req["servicename"] = service
+		req["acl"] = acl
+		return self._dorequest(req,dump)
+
+	def hasacl(self, user, service, acl, dump=defaultdump):
+		req = {}
+		req["cmd"]="hasacl"
+		req["username"] = user
+		req["servicename"] = service
+		req["acl"] = acl
+		return self._dorequest(req,dump)
+
 	def addidentifier(self, user, service, identifier, dump=defaultdump):
 		req = {}
 		req["cmd"]="addidentifier"

@@ -36,6 +36,7 @@ public:
 
 	void AddAcl(const string& username, const string& service, const string& entity);
     void RemoveAcl(const string& username, const string& service, const string& entity);
+	bool ACLEmpty(const string& username, const string& service);
 	bool HasACL(const string& username, const string& service, const string& entity);
 	vector<string> GetACL(const string& username, const string& service);
 

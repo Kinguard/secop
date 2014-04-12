@@ -31,6 +31,7 @@ using namespace Utils::Net;
  */
 #define UNINITIALIZED	0x01
 #define INITIALIZED		0x02
+#define AUTHENTICATED	0x04
 
 /*
  * Bit patterns for argument checks

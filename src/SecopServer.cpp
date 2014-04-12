@@ -11,6 +11,8 @@
 #include <libutils/Socket.h>
 #include <libutils/Logger.h>
 
+#include <map>
+
 using namespace std;
 using namespace Utils;
 using namespace Utils::Net;
@@ -35,6 +37,94 @@ public:
 
 };
 
+class PolicyController
+{
+	/* Key - Policy value - default reply if user not mentioned */
+	map<string, bool> dfl;
+
+	/* key - policy value map key - user value - policyvalue */
+	map<string, map<string, bool> > pol;
+public:
+	PolicyController()
+	{
+		dfl["createuser"]	= false;
+		pol["createuser"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["removeuser"]	= false;
+		pol["removeuser"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["removeservice"]	= false;
+		pol["removeservice"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["addacl"]	= false;
+		pol["addacl"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["removeacl"]	= false;
+		pol["removeacl"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["addidentifier"]	= false;
+		pol["addidentifier"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["removeidentifier"]	= false;
+		pol["removeidentifier"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+	}
+
+	bool Check(const string& actor, const string& policy )
+	{
+		if( this->pol.find(policy) == this->pol.end() )
+		{
+			throw std::runtime_error("Unknown policy");
+		}
+
+		/*
+		 * Setup default return value
+		 * Default is deny if not defined
+		 */
+		bool ret = false;
+		if( this->dfl.find(policy) != this->dfl.end() )
+		{
+			ret = this->dfl[policy];
+		}
+
+		/* Check if user is mentioned */
+		if( this->pol[policy].find(actor) != this->pol[policy].end() )
+		{
+			ret = this-pol[policy][actor];
+		}
+
+		return ret;
+	}
+
+	virtual ~PolicyController()
+	{
+
+	}
+};
+
+static PolicyController pc;
+
 SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 		state(UNINITIALIZED),
 		Utils::Net::NetServer(UnixStreamServerSocketPtr( new UnixStreamServerSocket(socketpath)), 0),
@@ -44,26 +134,26 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 
 	// Setup commands possible
 	this->actions["init"]=make_pair(UNINITIALIZED, &SecopServer::DoInitialize);
-	this->actions["status"]=make_pair(UNINITIALIZED|INITIALIZED, &SecopServer::DoStatus);
+	this->actions["status"]=make_pair(UNINITIALIZED|INITIALIZED|AUTHENTICATED, &SecopServer::DoStatus);
 	this->actions["auth"]=make_pair(INITIALIZED, &SecopServer::DoAuthenticate );
 
-	this->actions["createuser"]=make_pair(INITIALIZED, &SecopServer::DoCreateUser );
-	this->actions["removeuser"]=make_pair(INITIALIZED, &SecopServer::DoRemoveUser );
-	this->actions["getusers"]=make_pair(INITIALIZED, &SecopServer::DoGetUsers );
+	this->actions["createuser"]=make_pair(AUTHENTICATED, &SecopServer::DoCreateUser );
+	this->actions["removeuser"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveUser );
+	this->actions["getusers"]=make_pair(AUTHENTICATED, &SecopServer::DoGetUsers );
 
-	this->actions["getservices"]=make_pair(INITIALIZED, &SecopServer::DoGetServices );
-	this->actions["addservice"]=make_pair(INITIALIZED, &SecopServer::DoAddService );
-	this->actions["removeservice"]=make_pair(INITIALIZED, &SecopServer::DoRemoveService );
+	this->actions["getservices"]=make_pair(AUTHENTICATED, &SecopServer::DoGetServices );
+	this->actions["addservice"]=make_pair(AUTHENTICATED, &SecopServer::DoAddService );
+	this->actions["removeservice"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveService );
 
-	this->actions["getacl"]=make_pair(INITIALIZED, &SecopServer::DoGetACL );
-	this->actions["addacl"]=make_pair(INITIALIZED, &SecopServer::DoAddACL );
-	this->actions["removeacl"]=make_pair(INITIALIZED, &SecopServer::DoRemoveACL );
-	this->actions["hasacl"]=make_pair(INITIALIZED, &SecopServer::DoHasACL );
+	this->actions["getacl"]=make_pair(AUTHENTICATED, &SecopServer::DoGetACL );
+	this->actions["addacl"]=make_pair(AUTHENTICATED, &SecopServer::DoAddACL );
+	this->actions["removeacl"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveACL );
+	this->actions["hasacl"]=make_pair(AUTHENTICATED, &SecopServer::DoHasACL );
 
 
-	this->actions["addidentifier"]=make_pair(INITIALIZED, &SecopServer::DoAddIdentifier );
-	this->actions["removeidentifier"]=make_pair(INITIALIZED, &SecopServer::DoRemoveIdentifier );
-	this->actions["getidentifiers"]=make_pair(INITIALIZED, &SecopServer::DoGetIdentifiers );
+	this->actions["addidentifier"]=make_pair(AUTHENTICATED, &SecopServer::DoAddIdentifier );
+	this->actions["removeidentifier"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveIdentifier );
+	this->actions["getidentifiers"]=make_pair(AUTHENTICATED, &SecopServer::DoGetIdentifiers );
 }
 
 void
@@ -76,8 +166,17 @@ SecopServer::Dispatch ( SocketPtr con )
 
 	char buf[64*1024];
 	size_t rd;
+
+	// Reset possible state left over from last session
+
 	Json::Value session;
 	session["user"]["authenticated"]=false;
+
+	if( this->state == AUTHENTICATED )
+	{
+		this->state = INITIALIZED;
+	}
+
 	try
 	{
 		while( (rd = sock->Read(buf, sizeof(buf))) > 0 )
@@ -107,6 +206,8 @@ SecopServer::Dispatch ( SocketPtr con )
 	{
 		logg << Logger::Debug << "Caught exception on socket read ("<<e.what()<<")"<<lend;
 	}
+
+	// Make sure user is "logged out"
 
 	this->decreq();
 }
@@ -242,7 +343,6 @@ SecopServer::SendOK (UnixStreamClientSocketPtr& client, const Json::Value& cmd, 
 void
 SecopServer::DoInitialize ( UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session )
 {
-	//Todo: Only let root call this?
 	ScopedLog l("Initialize");
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID, cmd) )
@@ -398,6 +498,7 @@ SecopServer::DoAuthenticate ( UnixStreamClientSocketPtr& client,
 		return;
 	}
 	session["user"]["authenticated"]=true;
+	this->state = AUTHENTICATED;
 	this->SendOK(client, cmd);
 }
 
@@ -409,6 +510,12 @@ SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
 	{
+		return;
+	}
+
+	if( ! pc.Check(session["user"]["username"].asString(), "createuser") )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
@@ -429,6 +536,7 @@ SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 
 	this->store->CreateUser(user);
 	this->store->AddService(user, OPIUSER);
+	this->store->AddAcl(user, OPIUSER, "root");
 
 	Json::Value id(Json::objectValue);
 	id["password"]=pwd.c_str();
@@ -445,6 +553,12 @@ SecopServer::DoRemoveUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
 	{
+		return;
+	}
+
+	if( ! pc.Check(session["user"]["username"].asString(), "removeuser") )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
@@ -545,8 +659,6 @@ SecopServer::DoAddService(UnixStreamClientSocketPtr &client, Json::Value &cmd, J
 void
 SecopServer::DoRemoveService(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
 {
-	//TODO: Access control!
-	//TODO: Howto handle opiuser service?
 
 	ScopedLog l("Remove service");
 
@@ -568,6 +680,17 @@ SecopServer::DoRemoveService(UnixStreamClientSocketPtr &client, Json::Value &cmd
 	{
 		this->SendErrorMessage(client, cmd, 3, "Service unknown");
 		return;
+	}
+
+	/* Check if user is allowed to bypass acl-check */
+	if( ! pc.Check(session["user"]["username"].asString(), "removeservice" ) )
+	{
+		/* Only allowed to remove if no ACL or mentioned in ACL */
+		if ( ! this->store->ACLEmpty(user, service) && ! this->store->HasACL(user, service, session["user"]["username"].asString() ) )
+		{
+			this->SendErrorMessage(client, cmd, 4, "Not allowed");
+			return;
+		}
 	}
 
 	this->store->RemoveService(user, service);
@@ -604,6 +727,8 @@ SecopServer::DoGetACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 	vector<string> acls = this->store->GetACL(user, service );
 
 	Json::Value ret(Json::objectValue);
+
+	ret["acl"] = Json::Value(Json::arrayValue);
 
 	for( auto acl: acls )
 	{
@@ -650,6 +775,24 @@ SecopServer::DoAddACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 		return;
 	}
 
+	/* A user can add an ACL if none of the following are true -
+	 *   There are ACLs present
+	 *   User is not already in ACL
+	 *   Policy disallows user to always add ACLs
+	 */
+
+	if( ! this->store->ACLEmpty(user, service) )
+	{
+		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		{
+			if ( ! pc.Check(session["user"]["username"].asString() , "addacl") )
+			{
+				this->SendErrorMessage(client, cmd, 4, "Not allowed");
+				return;
+			}
+		}
+	}
+
 	this->store->AddAcl(user, service, acl);
 
 	this->SendOK(client, cmd);
@@ -692,6 +835,20 @@ SecopServer::DoRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Js
 	{
 		this->SendErrorMessage(client, cmd, 2, "ACL not present");
 		return;
+	}
+
+	/* A user can remove a ACL if none of the following are true -
+	 *   User is not already in ACL
+	 *   Policy disallows user to always remove ACLs
+	 */
+
+	if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+	{
+		if ( ! pc.Check(session["user"]["username"].asString() , "addacl") )
+		{
+			this->SendErrorMessage(client, cmd, 4, "Not allowed");
+			return;
+		}
 	}
 
 	this->store->RemoveAcl(user, service, acl);
@@ -769,6 +926,23 @@ SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd
 		return;
 	}
 
+	/* A user is allowed to add an identifier if -
+	 * Policy gives global add capabilities
+	 * User is in ACL
+	 */
+
+	if( ! this->store->ACLEmpty(user, service) )
+	{
+		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		{
+			if ( ! pc.Check(session["user"]["username"].asString() , "addidentifier") )
+			{
+				this->SendErrorMessage(client, cmd, 4, "Not allowed");
+				return;
+			}
+		}
+	}
+
 	this->store->AddIdentifier(user, service, cmd["identifier"]);
 
 	this->SendOK(client, cmd);
@@ -777,7 +951,6 @@ SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd
 void
 SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
 {
-	//TODO: Access control!
 
 	ScopedLog l("Remove identifier");
 
@@ -805,6 +978,23 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
 		return;
+	}
+
+	/* A user is allowed to remove an identifier if -
+	 * Policy gives global remove capabilities
+	 * User is in ACL
+	 */
+
+	if( ! this->store->ACLEmpty(user, service) )
+	{
+		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		{
+			if ( ! pc.Check(session["user"]["username"].asString() , "removeidentifier") )
+			{
+				this->SendErrorMessage(client, cmd, 4, "Not allowed");
+				return;
+			}
+		}
 	}
 
 	bool id_hasname = false, id_hasservice = false;
@@ -895,6 +1085,14 @@ SecopServer::DoGetIdentifiers(UnixStreamClientSocketPtr &client, Json::Value &cm
 	if( !this->store->HasService(user,service) )
 	{
 		this->SendErrorMessage(client, cmd, 3, "Service unknown");
+		return;
+	}
+
+	/* Todo, add policy check */
+	// Not empty and user not in ACL
+	if( ! this->store->ACLEmpty(user, service) && ! this->store->HasACL(user, service, session["user"]["username"].asString() ) )
+	{
+		this->SendErrorMessage(client, cmd, 4, "Access not allowed");
 		return;
 	}
 
