@@ -89,6 +89,12 @@ public:
 			{"tor", true} // For debug
 		};
 
+		dfl["getidentifiers"]	= false;
+		pol["getidentifiers"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
 	}
 
 	bool Check(const string& actor, const string& policy )
@@ -221,7 +227,15 @@ SecopServer::ProcessOneCommand ( UnixStreamClientSocketPtr& client,
 	{
 		if( this->state & this->actions[action].first )
 		{
-			((*this).*actions[action].second)(client,cmd, session);
+			try
+			{
+				((*this).*actions[action].second)(client,cmd, session);
+			}
+			catch( std::runtime_error& err)
+			{
+				logg << Logger::Error << "Failed to execute command "<< action << ": "<<err.what()<<lend;
+				this->SendErrorMessage(client, cmd, 4, "Internal error");
+			}
 		}
 		else
 		{
@@ -1090,7 +1104,9 @@ SecopServer::DoGetIdentifiers(UnixStreamClientSocketPtr &client, Json::Value &cm
 
 	/* Todo, add policy check */
 	// Not empty and user not in ACL
-	if( ! this->store->ACLEmpty(user, service) && ! this->store->HasACL(user, service, session["user"]["username"].asString() ) )
+	if( ! this->store->ACLEmpty(user, service) &&
+			! this->store->HasACL(user, service, session["user"]["username"].asString() ) &&
+			! pc.Check(session["user"]["username"].asString(), "getidentifiers") )
 	{
 		this->SendErrorMessage(client, cmd, 4, "Access not allowed");
 		return;
