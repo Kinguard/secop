@@ -1,0 +1,22 @@
+#!/bin/sh
+
+set -e
+
+case "$1" in
+    configure)
+      if [ -z "`id -u secop 2> /dev/null`" ]; then
+        adduser --system --group --home /var/opi/secop --gecos "Secop user" --no-create-home --disabled-password --quiet secop || true
+        chown -fR secop:secop /var/opi/secop || true
+	chmod 0700 /var/opi/secop
+      fi
+    ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+        
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+#DEBHELPER#

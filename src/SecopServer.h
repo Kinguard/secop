@@ -17,6 +17,8 @@
 #include "json/json.h"
 #include "CryptoStorage.h"
 
+#include "Config.h"
+
 using namespace std;
 using namespace Utils::Net;
 

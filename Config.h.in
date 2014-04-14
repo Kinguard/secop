@@ -5,4 +5,7 @@
 #define SECOP_VERSION_MINOR @SECOP_VERSION_MINOR@
 #define SECOP_APP_NAME "@SECOP_APP_NAME@"
 
+#define SOCKPATH	"/tmp/secop"
+#define DBPATH		"/var/opi/secop/secop.db"
+
 #endif

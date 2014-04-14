@@ -24,8 +24,6 @@ using namespace Utils;
 using namespace Utils::Net;
 using namespace std::placeholders;
 
-#define SOCKPATH	"/tmp/secop"
-#define DBPATH		"/tmp/secop.db"
 
 class SecopApp: public DaemonApplication
 {
@@ -46,11 +44,14 @@ public:
 
 		unlink(SOCKPATH);
 
-		this->secop = SecopServerPtr( new SecopServer( SOCKPATH, DBPATH) );
 	}
 
 	virtual void Main()
 	{
+		this->secop = SecopServerPtr( new SecopServer( SOCKPATH, DBPATH) );
+
+		chmod( SOCKPATH, 0666);
+
 		this->secop->Run();
 	}
 

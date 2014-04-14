@@ -1,3 +1,11 @@
+secop (0.9.1) testing; urgency=low
+
+  * Add secop user and run as this
+  * Add enforcements of ACL
+  * Added policies and using them
+
+ -- Tor Krill <tor@openproducts.se>  Mon, 14 Apr 2014 12:41:52 +0200
+
 secop (0.9) testing; urgency=low
 
   * Initial Release.
