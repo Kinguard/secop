@@ -31,10 +31,10 @@ class Client:
 			if dump:
 				print "Request failed with error '%s'"%req["status"]["desc"]
 			return (False,"Request failed with error '%s'"%req["status"]["desc"])
-		
+
 
 	def __del__(self):
-		self.con.close()	
+		self.con.close()
 
 class Secop(Client):
 
@@ -52,7 +52,7 @@ class Secop(Client):
 		req["cmd"]="auth"
 		req["type"]="socket"
 		return self._dorequest(req,dump)
-	
+
 	def plainauth(self, user, password, dump=defaultdump):
 		req = {}
 		req["cmd"]="auth"
@@ -61,30 +61,60 @@ class Secop(Client):
 		req["password"]=password
 		return self._dorequest(req,dump)
 
-	def adduser(self, user, password, dump=defaultdump):
+	def adduser(self, user, password, display=None, dump=defaultdump):
 		req = {}
 		req["cmd"]="createuser"
 		req["username"]=user
 		req["password"]=password
+		if display:
+			req["displayname"] = display
 		return self._dorequest(req,dump)
-	
+
 	def removeuser(self, user, dump=defaultdump):
 		req = {}
 		req["cmd"]="removeuser"
 		req["username"]=user
 		return self._dorequest(req,dump)
-	
+
 	def getusers(self, dump=defaultdump):
 		req = {}
 		req["cmd"]="getusers"
 		return self._dorequest(req,dump)
-	
+
+	def getattributes(self, user, dump=defaultdump):
+		req = {}
+		req["cmd"]="getattributes"
+		req["username"]=user
+		return self._dorequest(req,dump)
+
+	def getattribute(self, user, attribute, dump=defaultdump):
+		req = {}
+		req["cmd"]="getattribute"
+		req["username"]=user
+		req["attribute"] = attribute
+		return self._dorequest(req,dump)
+
+	def addattribute(self, user, attribute, value, dump=defaultdump):
+		req = {}
+		req["cmd"]="addattribute"
+		req["username"] = user
+		req["attribute"] = attribute
+		req["value"] = value
+		return self._dorequest(req,dump)
+
+	def removeattribute(self, user, attribute, dump=defaultdump):
+		req = {}
+		req["cmd"]="removeattribute"
+		req["username"] = user
+		req["attribute"] = attribute
+		return self._dorequest(req,dump)
+
 	def getservices(self, user, dump=defaultdump):
 		req = {}
 		req["cmd"]="getservices"
 		req["username"] = user
 		return self._dorequest(req,dump)
-		
+
 	def addservice(self, user, service, dump=defaultdump):
 		req = {}
 		req["cmd"]="addservice"
@@ -152,5 +182,5 @@ class Secop(Client):
 		req["username"] = user
 		req["servicename"] = service
 		return self._dorequest(req,dump)
-		
+
 

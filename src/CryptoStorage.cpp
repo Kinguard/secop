@@ -118,7 +118,7 @@ CryptoStorage::AddService ( const string& username, const string& servicename )
 		throw std::runtime_error("Service already added");
 	}
 
-	this->data["user"][username][servicename]["acl"] = Json::Value(Json::arrayValue);
+	this->data["user"][username]["services"][servicename]["acl"] = Json::Value(Json::arrayValue);
 
 	this->Write();
 }
@@ -136,7 +136,7 @@ CryptoStorage::RemoveService( const string& username, const string& servicename 
 		throw std::runtime_error("Service not found for user");
 	}
 
-	this->data["user"][username].removeMember(servicename);
+	this->data["user"][username]["services"].removeMember(servicename);
 
 	this->Write();
 }
@@ -148,7 +148,7 @@ CryptoStorage::GetServices(const string &username)
 	{
 		throw std::runtime_error("User unknown in get services");
 	}
-	return this->data["user"][username].getMemberNames();
+	return this->data["user"][username]["services"].getMemberNames();
 }
 
 vector<string>
@@ -159,10 +159,10 @@ CryptoStorage::GetACL(const string& username, const string& service)
 		throw std::runtime_error("Service unknown");
 	}
 
-	if( this->data["user"][username][service].isMember("acl") )
+	if( this->data["user"][username]["services"][service].isMember("acl") )
 	{
 		// Element is present, verify
-		if( ! this->data["user"][username][service]["acl"].isArray() )
+		if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
@@ -170,11 +170,11 @@ CryptoStorage::GetACL(const string& username, const string& service)
 	else
 	{
 		// Not present, create
-		this->data["user"][username][service]["acl"]=Json::Value(Json::arrayValue);
+		this->data["user"][username]["services"][service]["acl"]=Json::Value(Json::arrayValue);
 	}
 
 	vector<string> ret;
-	Json::Value acl = this->data["user"][username][service]["acl"];
+	Json::Value acl = this->data["user"][username]["services"][service]["acl"];
 	for( auto ent: acl)
 	{
 		if( ent.isString() )
@@ -194,10 +194,10 @@ CryptoStorage::AddAcl ( const string& username, const string& service,
 		throw std::runtime_error("Service unknown");
 	}
 
-	if( this->data["user"][username][service].isMember("acl") )
+	if( this->data["user"][username]["services"][service].isMember("acl") )
 	{
 		// Element is present, verify
-		if( ! this->data["user"][username][service]["acl"].isArray() )
+		if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
@@ -205,12 +205,12 @@ CryptoStorage::AddAcl ( const string& username, const string& service,
 	else
 	{
 		// Not present, create
-		this->data["user"][username][service]["acl"]=Json::Value(Json::arrayValue);
+		this->data["user"][username]["services"][service]["acl"]=Json::Value(Json::arrayValue);
 	}
 
 	bool found = false;
 
-	for(auto v : this->data["user"][username][service]["acl"] )
+	for(auto v : this->data["user"][username]["services"][service]["acl"] )
 	{
         if( v.isString() && v.asString() == entity )
 		{
@@ -220,7 +220,7 @@ CryptoStorage::AddAcl ( const string& username, const string& service,
 
 	if( ! found )
 	{
-		this->data["user"][username][service]["acl"].append( Json::Value( entity ) );
+		this->data["user"][username]["services"][service]["acl"].append( Json::Value( entity ) );
 
 		this->Write();
 	}
@@ -233,24 +233,24 @@ CryptoStorage::RemoveAcl(const string &username, const string &service, const st
 		throw std::runtime_error("Service unknown");
 	}
 
-	if( this->data["user"][username][service].isMember("acl") )
+	if( this->data["user"][username]["services"][service].isMember("acl") )
 	{
 		// Element is present, verify
-		if( ! this->data["user"][username][service]["acl"].isArray() )
+		if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
 	}
 
 	Json::Value newArray(Json::arrayValue);
-	for( auto x: this->data["user"][username][service]["acl"] )
+	for( auto x: this->data["user"][username]["services"][service]["acl"] )
 	{
 		if( x.isString() && x.asString() != entity )
 		{
 			newArray.append(x.asString() );
 		}
 	}
-	this->data["user"][username][service]["acl"] = newArray;
+	this->data["user"][username]["services"][service]["acl"] = newArray;
 }
 
 bool
@@ -266,12 +266,13 @@ CryptoStorage::ACLEmpty(const string &username, const string &service)
 		throw std::runtime_error("Service not found for user");
 	}
 
-	if( ! this->data["user"][username][service].isMember("acl") || ! this->data["user"][username][service]["acl"].isArray() )
+	if( ! this->data["user"][username]["services"][service].isMember("acl")
+			|| ! this->data["user"][username]["services"][service]["acl"].isArray() )
 	{
 		throw std::runtime_error("Malformed syntax in storage");
 	}
 
-	return this->data["user"][username][service]["acl"].size() == 0;
+	return this->data["user"][username]["services"][service]["acl"].size() == 0;
 }
 
 bool
@@ -288,13 +289,14 @@ CryptoStorage::HasACL(const string &username, const string &service, const strin
 		throw std::runtime_error("Service not found for user");
 	}
 
-	if( ! this->data["user"][username][service].isMember("acl") || ! this->data["user"][username][service]["acl"].isArray() )
+	if( ! this->data["user"][username]["services"][service].isMember("acl")
+			|| ! this->data["user"][username]["services"][service]["acl"].isArray() )
 	{
 		throw std::runtime_error("Malformed syntax in storage");
 	}
 
 	bool found = false;
-	for( auto x: this->data["user"][username][service]["acl"] )
+	for( auto x: this->data["user"][username]["services"][service]["acl"] )
 	{
 		if( x.isString() && x.asString() == entity )
 		{
@@ -324,10 +326,10 @@ CryptoStorage::GetIdentifiers ( const string& username, const string& service )
 		throw std::runtime_error("No such service");
 	}
 
-	if( this->data["user"][username][service].isMember("identifiers") )
+	if( this->data["user"][username]["services"][service].isMember("identifiers") )
 	{
 		// Element is present, verify
-		if( ! this->data["user"][username][service]["identifiers"].isString() )
+		if( ! this->data["user"][username]["services"][service]["identifiers"].isString() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
@@ -336,7 +338,6 @@ CryptoStorage::GetIdentifiers ( const string& username, const string& service )
 	{
 		// Not present, create
 		this->UpdateIdentifiers(username, service, Json::Value(Json::arrayValue) );
-		//this->data["user"][username][service]["identifiers"]=Json::Value(Json::arrayValue);
 	}
 	return this->DecryptIdentifiers(username,service);
 }
@@ -375,14 +376,22 @@ CryptoStorage::Write ()
 }
 
 void
-CryptoStorage::CreateUser ( const string& username )
+CryptoStorage::CreateUser (const string& username , const string &displayname)
 {
 	if( this->HasUser(username) )
 	{
 		throw std::runtime_error("User already exists");
 	}
-	this->data["user"][username]=Json::nullValue;
+	this->data["user"][username]["services"]=Json::nullValue;
 
+	if( displayname != "" )
+	{
+		this->data["user"][username]["attributes"]["displayname"]=displayname;
+	}
+	else
+	{
+		this->data["user"][username]["attributes"]=Json::nullValue;
+	}
 	this->Write();
 }
 
@@ -410,10 +419,74 @@ CryptoStorage::GetUsers()
 	return this->data["user"].getMemberNames();
 }
 
+bool CryptoStorage::HasAttribute(const string &username, const string &attributename)
+{
+	if( ! this->HasUser(username) )
+	{
+		return false;
+	}
+	return this->data["user"][username]["attributes"].isMember(attributename);
+
+}
+
+vector<string> CryptoStorage::GetAttributes(const string &username)
+{
+	if( ! this->HasUser(username) )
+	{
+		throw std::runtime_error("User not found");
+	}
+
+	return this->data["user"][username]["attributes"].getMemberNames();
+}
+
+string CryptoStorage::GetAttribute(const string &username, const string &attributename)
+{
+	if( ! this->HasAttribute(username, attributename) )
+	{
+		throw std::runtime_error("User or attribute not found");
+	}
+
+	return this->data["user"][username]["attributes"][attributename].asString();
+}
+
+void CryptoStorage::AddAttribute(const string &username, const string &attributename, const string attributevalue)
+{
+	if( ! this->HasUser(username) )
+	{
+		throw std::runtime_error("User not found");
+	}
+
+	if( this->HasAttribute(username, attributename) )
+	{
+		throw std::runtime_error("Attribute already exists");
+	}
+
+	this->data["user"][username]["attributes"][attributename]=attributevalue;
+
+	this->Write();
+}
+
+void CryptoStorage::RemoveAttribute(const string &username, const string &attributename)
+{
+	if( ! this->HasUser(username) )
+	{
+		throw std::runtime_error("User not found");
+	}
+
+	if( !this->HasAttribute(username, attributename) )
+	{
+		throw std::runtime_error("Attribute not found");
+	}
+
+	this->data["user"][username]["attributes"].removeMember(attributename);
+
+	this->Write();
+}
+
 bool
 CryptoStorage::HasService ( const string& user, const string& service )
 {
-	return this->data["user"][user].isMember(service);
+	return this->data["user"][user]["services"].isMember(service);
 }
 
 bool
@@ -427,10 +500,10 @@ CryptoStorage::DecryptIdentifiers(const string& username, const string& service)
 {
 	vector<byte> iv;
 
-	Crypto::Base64Decode(this->data["user"][username][service]["iv"].asString(), iv);
+	Crypto::Base64Decode(this->data["user"][username]["services"][service]["iv"].asString(), iv);
 
 	vector<byte> val;
-	Crypto::Base64Decode(this->data["user"][username][service]["identifiers"].asString(), val);
+	Crypto::Base64Decode(this->data["user"][username]["services"][service]["identifiers"].asString(), val);
 
 	this->idcrypto.Initialize(this->key, iv);
 	string ids = this->idcrypto.Decrypt(val);
@@ -449,7 +522,7 @@ CryptoStorage::EncryptIdentifiers(const string& username, const string& service,
 	this->rnd.GenerateBlock(&iv[0], iv.size() );
 
 	string b64iv = Crypto::Base64Encode( iv );
-	this->data["user"][username][service]["iv"]=b64iv;
+	this->data["user"][username]["services"][service]["iv"]=b64iv;
 
 	this->idcrypto.Initialize(this->key, iv);
 
@@ -457,7 +530,7 @@ CryptoStorage::EncryptIdentifiers(const string& username, const string& service,
 			this->idcrypto.Encrypt( this->writer.write(val) )
 			);
 
-	this->data["user"][username][service]["identifiers"] = b64val;
+	this->data["user"][username]["services"][service]["identifiers"] = b64val;
 }
 
 

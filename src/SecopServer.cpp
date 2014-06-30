@@ -147,6 +147,11 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 	this->actions["removeuser"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveUser );
 	this->actions["getusers"]=make_pair(AUTHENTICATED, &SecopServer::DoGetUsers );
 
+	this->actions["getattributes"] = make_pair(AUTHENTICATED, &SecopServer::DoGetAttributes );
+	this->actions["getattribute"] = make_pair(AUTHENTICATED, &SecopServer::DoGetAttribute );
+	this->actions["addattribute"] = make_pair(AUTHENTICATED, &SecopServer::DoAddAttribute );
+	this->actions["removeattribute"] = make_pair(AUTHENTICATED, &SecopServer::DoRemoveAttribute );
+
 	this->actions["getservices"]=make_pair(AUTHENTICATED, &SecopServer::DoGetServices );
 	this->actions["addservice"]=make_pair(AUTHENTICATED, &SecopServer::DoAddService );
 	this->actions["removeservice"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveService );
@@ -541,6 +546,12 @@ SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 
 	string user = cmd["username"].asString();
 	SecString pwd = cmd["password"].asCString();
+	string displayname;
+
+	if( cmd.isMember("displayname") || cmd["displayname"].isString() )
+	{
+		displayname = cmd["displayname"].asString();
+	}
 
 	if( this->store->HasUser(user) )
 	{
@@ -548,7 +559,7 @@ SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 		return;
 	}
 
-	this->store->CreateUser(user);
+	this->store->CreateUser(user, displayname);
 	this->store->AddService(user, OPIUSER);
 	this->store->AddAcl(user, OPIUSER, "root");
 
@@ -609,6 +620,154 @@ SecopServer::DoGetUsers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Jso
 	{
 		ret["users"].append(user);
 	}
+	this->SendOK(client, cmd, ret);
+}
+
+void SecopServer::DoAddAttribute(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	//TODO: Access control!
+	ScopedLog l("Add Attribute");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
+	{
+		return;
+	}
+
+	string user = cmd["username"].asString();
+
+	if( ! this->store->HasUser(user) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "User unknown");
+		return;
+	}
+
+	if( !cmd.isMember("attribute") || !cmd["attribute"].isString() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return;
+	}
+
+	if( !cmd.isMember("value") || !cmd["value"].isString() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return;
+	}
+
+	string attribute = cmd["attribute"].asString();
+	string value = cmd["value"].asString();
+
+	if( this->store->HasAttribute(user, attribute ) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Attribute exists");
+		return;
+	}
+
+	this->store->AddAttribute(user, attribute, value );
+
+	this->SendOK(client, cmd);
+}
+
+void SecopServer::DoRemoveAttribute(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	//TODO: Access control!
+	ScopedLog l("Remove Attribute");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
+	{
+		return;
+	}
+
+	string user = cmd["username"].asString();
+
+	if( ! this->store->HasUser(user) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "User unknown");
+		return;
+	}
+
+	if( !cmd.isMember("attribute") || !cmd["attribute"].isString() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return;
+	}
+
+	string attribute = cmd["attribute"].asString();
+
+	if( !this->store->HasAttribute(user, attribute ) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "No such attribute");
+		return;
+	}
+
+	this->store->RemoveAttribute(user,attribute);
+
+	this->SendOK(client, cmd);
+}
+
+void SecopServer::DoGetAttributes(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	//TODO: Access control!
+	ScopedLog l("get Attributes");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
+	{
+		return;
+	}
+
+	string user = cmd["username"].asString();
+
+	if( ! this->store->HasUser(user) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "User unknown");
+		return;
+	}
+
+	vector<string> attrs = this->store->GetAttributes(user);
+
+	Json::Value ret(Json::objectValue);
+
+	for( auto attr: attrs )
+	{
+		ret["attributes"].append(attr);
+	}
+	this->SendOK(client, cmd, ret);
+}
+
+void SecopServer::DoGetAttribute(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	//TODO: Access control!
+	ScopedLog l("Get Attribute");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
+	{
+		return;
+	}
+
+	string user = cmd["username"].asString();
+
+	if( ! this->store->HasUser(user) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "User unknown");
+		return;
+	}
+
+	if( !cmd.isMember("attribute") || !cmd["attribute"].isString() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return;
+	}
+
+	string attribute = cmd["attribute"].asString();
+
+	if( ! this->store->HasAttribute(user, attribute ) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "Attribute unknown");
+		return;
+	}
+
+	Json::Value ret(Json::objectValue);
+	ret["attribute"] = this->store->GetAttribute(user,attribute);
+
 	this->SendOK(client, cmd, ret);
 }
 

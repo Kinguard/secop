@@ -64,11 +64,13 @@ class Secop(Client):
 		req["password"]=password
 		return self._dorequest(req,dump)
 
-	def adduser(self, user, password, dump=defaultdump):
+	def adduser(self, user, password, display=None, dump=defaultdump):
 		req = {}
 		req["cmd"]="createuser"
 		req["username"]=user
 		req["password"]=password
+		if display:
+			req["displayname"] = display
 		return self._dorequest(req,dump)
 
 	def removeuser(self, user, dump=defaultdump):
@@ -80,6 +82,34 @@ class Secop(Client):
 	def getusers(self, dump=defaultdump):
 		req = {}
 		req["cmd"]="getusers"
+		return self._dorequest(req,dump)
+
+	def getattributes(self, user, dump=defaultdump):
+		req = {}
+		req["cmd"]="getattributes"
+		req["username"]=user
+		return self._dorequest(req,dump)
+
+	def getattribute(self, user, attribute, dump=defaultdump):
+		req = {}
+		req["cmd"]="getattribute"
+		req["username"]=user
+		req["attribute"] = attribute
+		return self._dorequest(req,dump)
+
+	def addattribute(self, user, attribute, value, dump=defaultdump):
+		req = {}
+		req["cmd"]="addattribute"
+		req["username"] = user
+		req["attribute"] = attribute
+		req["value"] = value
+		return self._dorequest(req,dump)
+
+	def removeattribute(self, user, attribute, dump=defaultdump):
+		req = {}
+		req["cmd"]="removeattribute"
+		req["username"] = user
+		req["attribute"] = attribute
 		return self._dorequest(req,dump)
 
 	def getservices(self, user, dump=defaultdump):

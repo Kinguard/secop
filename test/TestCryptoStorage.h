@@ -11,6 +11,7 @@ class TestCryptoStorage: public CppUnit::TestFixture
 	CPPUNIT_TEST( TestService );
 	CPPUNIT_TEST( TestACL );
 	CPPUNIT_TEST( TestIdentifiers );
+	CPPUNIT_TEST( TestAttributes );
 	CPPUNIT_TEST_SUITE_END();
 public:
 	void setUp();
@@ -21,6 +22,7 @@ public:
 	void TestService();
 	void TestACL();
 	void TestIdentifiers();
+	void TestAttributes();
 };
 
 #endif /* TESTCRYPTOSTORAGE_H_ */

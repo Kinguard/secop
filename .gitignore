@@ -1,1 +1,7 @@
 CMakeLists.txt.user
+debian/*.debhelper
+debian/secop
+debian/files
+debian/secop.substvars
+debian/secop.debhelper*
+obj-x86_64*

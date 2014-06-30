@@ -65,6 +65,12 @@ protected:
 	void DoRemoveUser(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoGetUsers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 
+	void DoAddAttribute(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoRemoveAttribute(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGetAttributes(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGetAttribute(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+
+
 	void DoGetServices(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoAddService(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoRemoveService(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);

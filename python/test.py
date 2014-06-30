@@ -8,9 +8,10 @@ import time
 
 # Todo, find better user for this
 conf = {
-	"exe":["../../secop-build/secop","-u", "tor", "-g", "tor"],
+	"exe":["../../secop-build/secop","-u", "secop", "-g", "secop"],
 	"sock":"/tmp/secop",
-	"db":"/tmp/secop.db"
+#	"db":"/tmp/secop.db"
+	"db":"/var/opi/secop/secop.db"
 }
 
 def waitfile(file):
@@ -275,6 +276,48 @@ class TestSecop(TestBase):
 		# Remove user		
 		(status, res) = self.s.removeuser("user")
 		self.assertTrue( status )
+
+	def test_7_attr(self):
+		# Initialise db
+		(status, res) = self.s.init("Secret password")
+		#Authenticate
+		(status, res) = self.s.sockauth()
+		self.assertTrue( status )
+		# Add one user
+		(status, res) = self.s.adduser("user","secret","My Name")
+		self.assertTrue( status )
+		#Get attributes
+		(status, res) = self.s.getattributes("user")
+		self.assertTrue( status )
+		self.assertEqual( len(res["attributes"]), 1 )
+		#Get attribute
+		(status, res) = self.s.getattribute("user","displayname")
+		self.assertTrue( status )
+		self.assertEqual( res["attribute"], "My Name" )
+		(status, res) = self.s.getattribute("user","unknown")
+		self.assertFalse( status )
+		#Add attribute
+		(status, res) = self.s.addattribute("user","eyecolor","green")
+		(status, res) = self.s.getattribute("user","eyecolor")
+		self.assertTrue( status )
+		self.assertEqual( res["attribute"], "green" )
+		(status, res) = self.s.getattributes("user")
+		self.assertTrue( status )
+		self.assertEqual( len(res["attributes"]), 2 )
+		(status, res) = self.s.addattribute("user","eyecolor","green")
+		self.assertFalse( status )
+		(status, res) = self.s.addattribute("nouser","eyecolor","green")
+		self.assertFalse( status )
+		#Remove attribute
+		(status, res) = self.s.removeattribute("user","eyecolor")
+		self.assertTrue( status )
+		(status, res) = self.s.getattributes("user")
+		self.assertTrue( status )
+		self.assertEqual( len(res["attributes"]), 1 )
+		(status, res) = self.s.getattribute("user","eyecolor")
+		self.assertFalse( status )
+		(status, res) = self.s.removeattribute("user","eyecolor")
+		self.assertFalse( status )
 
 if __name__=='__main__':
 	print "Start"

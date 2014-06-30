@@ -144,3 +144,38 @@ void TestCryptoStorage::TestIdentifiers()
 	CPPUNIT_ASSERT( ret2[1]["user"].asString() == "new user");
 	CPPUNIT_ASSERT( ret2[0u]["user"].asString() == "user");
 }
+
+void TestCryptoStorage::TestAttributes()
+{
+	CryptoStorage c("/tmp/cstest.db","My Password");
+
+	CPPUNIT_ASSERT_NO_THROW( c.CreateUser("test","Tester Testsson") );
+	string display = c.GetAttribute("test","displayname");
+	CPPUNIT_ASSERT_EQUAL( display, string("Tester Testsson"));
+
+	CPPUNIT_ASSERT_THROW( c.GetAttribute("wronguser","noattr"), std::runtime_error);
+	CPPUNIT_ASSERT_THROW( c.GetAttribute("wronguser",""), std::runtime_error);
+
+	CPPUNIT_ASSERT_THROW( c.AddAttribute("test", "displayname", "No Nam"), std::runtime_error );
+	string aval = "green";
+	CPPUNIT_ASSERT_NO_THROW( c.AddAttribute("test", "eyecolor", aval) );
+	CPPUNIT_ASSERT( c.HasAttribute("test","eyecolor") );
+	CPPUNIT_ASSERT_EQUAL( c.GetAttribute("test","eyecolor"), aval);
+
+	CPPUNIT_ASSERT( ! c.HasAttribute("test","noattr") );
+	CPPUNIT_ASSERT_THROW( c.GetAttribute("test","noattr"), std::runtime_error);
+
+	vector<string> attrs = c.GetAttributes("test");
+	CPPUNIT_ASSERT_EQUAL( (int)attrs.size(), 2);
+
+	CPPUNIT_ASSERT_THROW( c.RemoveAttribute("nouser","noattr"), std::runtime_error);
+	CPPUNIT_ASSERT_THROW( c.RemoveAttribute("test","noattr"), std::runtime_error);
+	CPPUNIT_ASSERT_NO_THROW( c.RemoveAttribute("test","eyecolor") );
+
+	CPPUNIT_ASSERT( ! c.HasAttribute("test","eyecolor") );
+	CPPUNIT_ASSERT_THROW( c.GetAttribute("test","eyecolor"), std::runtime_error);
+
+	attrs = c.GetAttributes("test");
+	CPPUNIT_ASSERT_EQUAL( (int)attrs.size(), 1);
+
+}

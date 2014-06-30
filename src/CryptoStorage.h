@@ -25,9 +25,15 @@ public:
 	CryptoStorage (const string& path, const SecVector<byte>& key);
 
 	bool HasUser(const string& user);
-	void CreateUser(const string& username);
+	void CreateUser(const string& username, const string& displayname="");
 	void DeleteUser(const string& username);
 	vector<string> GetUsers(void);
+
+	bool HasAttribute( const string& username, const string& attributename);
+	vector<string> GetAttributes(const string& username);
+	string GetAttribute( const string& username, const string& attributename);
+	void AddAttribute(const string& username, const string& attributename, const string attributevalue);
+	void RemoveAttribute(const string& username, const string& attributename);
 
 	bool HasService( const string& user, const string& service);
 	void AddService(const string& username, const string& servicename);
