@@ -226,6 +226,25 @@ void TestCryptoStorage::TestAppACL()
 	CryptoStorage c("/tmp/cstest.db","My Password");
 	CPPUNIT_ASSERT_NO_THROW( c.CreateAppID("myappid") );
 
+	CPPUNIT_ASSERT_EQUAL((size_t)0, c.AppGetACL("myappid").size());
+
+	CPPUNIT_ASSERT( c.AppACLEmpty("myappid"));
+	CPPUNIT_ASSERT( ! c.AppHasACL("myappid","lll"));
+
 	CPPUNIT_ASSERT_NO_THROW( c.AppAddAcl("myappid","www-data") );
+	CPPUNIT_ASSERT( c.AppHasACL("myappid","www-data"));
+
+	CPPUNIT_ASSERT_EQUAL((size_t)1, c.AppGetACL("myappid").size());
+	CPPUNIT_ASSERT_NO_THROW( c.AppAddAcl("myappid","e2") );
+	CPPUNIT_ASSERT_EQUAL((size_t)2, c.AppGetACL("myappid").size());
+
+	CPPUNIT_ASSERT_NO_THROW( c.AppRemoveAcl("myappid","e2") );
+	CPPUNIT_ASSERT_EQUAL((size_t)1, c.AppGetACL("myappid").size());
+
+	CPPUNIT_ASSERT_NO_THROW( c.AppRemoveAcl("myappid","noe") );
+	CPPUNIT_ASSERT_EQUAL((size_t)1, c.AppGetACL("myappid").size());
+
+	CPPUNIT_ASSERT_THROW( c.AppRemoveAcl("lalala","noe"), std::runtime_error );
+
 
 }

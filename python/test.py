@@ -46,14 +46,14 @@ class TestBase(unittest.TestCase):
 
 
 class TestSecop(TestBase):
-	def test_1_status(self):
+	def test_01_status(self):
 		(status, res) = self.s.status()
 		self.assertTrue( status )
 		self.assertEqual( res["status"]["value"], 0)
 		self.assertEqual( res["server"]["api"], 1.0)
 		self.assertEqual( res["server"]["state"], 1)
 
-	def test_2_init(self):
+	def test_02_init(self):
 		# Create db
 		(status, res) = self.s.init("Secret password")
 		self.assertTrue( status )
@@ -72,7 +72,7 @@ class TestSecop(TestBase):
 		(status, res) = self.s.status()
 		self.assertEqual( res["server"]["state"], 2)
 
-	def test_3_user(self):
+	def test_03_user(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		self.assertTrue( status )
@@ -117,7 +117,7 @@ class TestSecop(TestBase):
 		self.assertTrue( status )
 		self.assertEqual( len(res["users"]),1)
 
-	def test_4_services(self):
+	def test_04_services(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		self.assertTrue( status )
@@ -148,7 +148,7 @@ class TestSecop(TestBase):
 		(status, res) = self.s.getservices("user")
 		self.assertEqual( len(res["services"]), 1)
 
-	def test_5_identifiers(self):
+	def test_05_identifiers(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -211,7 +211,7 @@ class TestSecop(TestBase):
 		(status, res) = self.s.removeuser("user")
 		self.assertTrue( status )
 
-	def test_6_acl(self):
+	def test_06_acl(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -277,7 +277,7 @@ class TestSecop(TestBase):
 		(status, res) = self.s.removeuser("user")
 		self.assertTrue( status )
 
-	def test_7_attr(self):
+	def test_07_attr(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -319,7 +319,7 @@ class TestSecop(TestBase):
 		(status, res) = self.s.removeattribute("user","eyecolor")
 		self.assertFalse( status )
 
-	def test_8_appid(self):
+	def test_08_appid(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -354,7 +354,7 @@ class TestSecop(TestBase):
 		(status, res) = self.s.removeappid("id2")
 		self.assertFalse( status )
 
-	def test_9_appidentifiers(self):
+	def test_09_appidentifiers(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -418,6 +418,86 @@ class TestSecop(TestBase):
 		(status, res) = self.s.getappidentifiers("myappid")
 		self.assertTrue( status )
 		self.assertEqual( 1, len(res["identifiers"]))
+
+	def test_10_appacl(self):
+		# Initialise db
+		(status, res) = self.s.init("Secret password")
+		#Authenticate
+		(status, res) = self.s.sockauth()
+		self.assertTrue( status )
+
+		# Add appid
+		(status, res) = self.s.addappid("myappid")
+		self.assertTrue( status )
+
+		# Add app acl
+		(status, res) = self.s.addappacl("myappid","www-data")
+		self.assertTrue( status )
+
+		(status, res) = self.s.addappacl("myappid","www-data")
+		self.assertFalse( status )
+
+		(status, res) = self.s.addappacl("noappid","noent")
+		self.assertFalse( status )
+		(status, res) = self.s.addappacl("","")
+		self.assertFalse( status )
+
+		(status, res) = self.s.addappacl("myappid","")
+		self.assertFalse( status )
+
+		# Get app acl
+		(status, res) = self.s.getappacl("myappid")
+		self.assertTrue( status )
+		self.assertEqual( 1, len(res["acl"]) )
+		self.assertEqual( res["acl"][0], "www-data" )
+
+		(status, res) = self.s.getappacl("wrongappid")
+		self.assertFalse( status )
+
+		(status, res) = self.s.getappacl("")
+		self.assertFalse( status )
+
+		(status, res) = self.s.addappacl("myappid","e2")
+		self.assertTrue( status )
+		(status, res) = self.s.getappacl("myappid")
+		self.assertTrue( status )
+		self.assertEqual( 2, len(res["acl"]) )
+
+		# Remove app acl
+		(status, res) = self.s.removeappacl("myappid","www-data")
+		self.assertTrue( status )
+		(status, res) = self.s.getappacl("myappid")
+		self.assertTrue( status )
+		self.assertEqual( 1, len(res["acl"]) )
+		self.assertEqual( res["acl"][0], "e2" )
+
+		(status, res) = self.s.removeappacl("myappid","www-data")
+		self.assertFalse( status )
+
+		(status, res) = self.s.removeappacl("myappid","e2")
+		self.assertTrue( status )
+		(status, res) = self.s.getappacl("myappid")
+		self.assertTrue( status )
+		self.assertEqual( 0, len(res["acl"]) )
+
+		# Has app acl
+		(status, res) = self.s.hasappacl("myappid","e1")
+		self.assertTrue( status )
+		self.assertFalse( res["hasacl"] )
+
+		(status, res) = self.s.addappacl("myappid","e1")
+		self.assertTrue( status )
+
+		(status, res) = self.s.hasappacl("myappid","e1")
+		self.assertTrue( status )
+		self.assertTrue( res["hasacl"] )
+
+		(status, res) = self.s.hasappacl("noapp","e1")
+		self.assertFalse( status )
+
+		(status, res) = self.s.hasappacl("","")
+		self.assertFalse( status )
+
 
 if __name__=='__main__':
 	print "Start"

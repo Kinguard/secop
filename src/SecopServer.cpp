@@ -107,6 +107,35 @@ public:
 			{"tor", true} // For debug
 		};
 
+		dfl["appaddacl"]	= false;
+		pol["appaddacl"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["removeappacl"]	= false;
+		pol["removeappacl"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["getappidentifiers"]	= false;
+		pol["getappidentifiers"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["addappidentifier"]	= false;
+		pol["addappidentifier"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["removeappidentifier"]	= false;
+		pol["removeappidentifier"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
 	}
 
 	bool Check(const string& actor, const string& policy )
@@ -187,6 +216,10 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 	this->actions["getappidentifiers"]=make_pair(AUTHENTICATED, &SecopServer::DoAppGetIdentifiers );
 	this->actions["removeappidentifier"]=make_pair(AUTHENTICATED, &SecopServer::DoAppRemoveIdentifier );
 
+	this->actions["addappacl"]=make_pair(AUTHENTICATED, &SecopServer::DoAppAddACL );
+	this->actions["getappacl"]=make_pair(AUTHENTICATED, &SecopServer::DoAppGetACL );
+	this->actions["removeappacl"]=make_pair(AUTHENTICATED, &SecopServer::DoAppRemoveACL );
+	this->actions["hasappacl"]=make_pair(AUTHENTICATED, &SecopServer::DoAppHasACL );
 }
 
 void
@@ -1051,7 +1084,7 @@ SecopServer::DoRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Js
 
 	if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
 	{
-		if ( ! pc.Check(session["user"]["username"].asString() , "addacl") )
+		if ( ! pc.Check(session["user"]["username"].asString() , "removeacl") )
 		{
 			this->SendErrorMessage(client, cmd, 4, "Not allowed");
 			return;
@@ -1363,19 +1396,15 @@ void SecopServer::DoAppGetIdentifiers(UnixStreamClientSocketPtr &client, Json::V
 		return;
 	}
 
-
-#if 0
-	TODO fix asap!
 	/* Todo, add policy check */
 	// Not empty and user not in ACL
-	if( ! this->store->ACLEmpty(user, service) &&
-			! this->store->HasACL(user, service, session["user"]["username"].asString() ) &&
-			! pc.Check(session["user"]["username"].asString(), "getidentifiers") )
+	if( ! this->store->AppACLEmpty(appid) &&
+			! this->store->AppHasACL( appid, session["user"]["username"].asString() ) &&
+			! pc.Check(session["user"]["username"].asString(), "getappidentifiers") )
 	{
 		this->SendErrorMessage(client, cmd, 4, "Access not allowed");
 		return;
 	}
-#endif
 
 	Json::Value ret(Json::objectValue);
 	ret["identifiers"] = this->store->AppGetIdentifiers( appid );
@@ -1407,25 +1436,22 @@ void SecopServer::DoAppAddIdentifier(UnixStreamClientSocketPtr &client, Json::Va
 		return;
 	}
 
-#if 0
-	TODO: Fix asap!
 	/* A user is allowed to add an identifier if -
 	 * Policy gives global add capabilities
 	 * User is in ACL
 	 */
 
-	if( ! this->store->ACLEmpty(user, service) )
+	if( ! this->store->AppACLEmpty(appid) )
 	{
-		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
 		{
-			if ( ! pc.Check(session["user"]["username"].asString() , "addidentifier") )
+			if ( ! pc.Check(session["user"]["username"].asString() , "addappidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
 			}
 		}
 	}
-#endif
 
 	this->store->AppAddIdentifier( appid, cmd["identifier"]);
 
@@ -1456,24 +1482,22 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 		return;
 	}
 
-#if 0
 	/* A user is allowed to remove an identifier if -
 	 * Policy gives global remove capabilities
 	 * User is in ACL
 	 */
 
-	if( ! this->store->ACLEmpty(user, service) )
+	if( ! this->store->AppACLEmpty( appid ) )
 	{
-		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
 		{
-			if ( ! pc.Check(session["user"]["username"].asString() , "removeidentifier") )
+			if ( ! pc.Check(session["user"]["username"].asString() , "removeappidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
 			}
 		}
 	}
-#endif
 
 	Json::Value needle = cmd["identifier"];
 	Json::Value ids = this->store->AppGetIdentifiers( appid );
@@ -1522,7 +1546,177 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 	}
 }
 
+void SecopServer::DoAppAddACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
 
+	ScopedLog l("Add app ACL");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
+	{
+		return;
+	}
+
+	if( !cmd.isMember("acl") || !cmd["acl"].isString() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return;
+	}
+	string appid = cmd["appid"].asString();
+	string acl = cmd["acl"].asString();
+
+	if( acl == "" )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Invalid argument");
+		return;
+	}
+
+	if( !this->store->HasAppID( appid ) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Appid unknown");
+		return;
+	}
+
+	if( this->store->AppHasACL(appid, acl) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "ACL already present");
+		return;
+	}
+
+	/* A user can add an ACL if none of the following are true -
+	 *   There are ACLs present
+	 *   User is not already in ACL
+	 *   Policy disallows user to always add ACLs
+	 */
+
+	if( ! this->store->AppACLEmpty( appid ) )
+	{
+		if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
+		{
+			if ( ! pc.Check(session["user"]["username"].asString() , "appaddacl") )
+			{
+				this->SendErrorMessage(client, cmd, 4, "Not allowed");
+				return;
+			}
+		}
+	}
+
+	this->store->AppAddAcl(appid, acl);
+
+	this->SendOK(client, cmd);
+
+}
+
+void SecopServer::DoAppGetACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Get app ACL");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
+	{
+		return;
+	}
+
+	string appid = cmd["appid"].asString();
+
+	if( !this->store->HasAppID( appid ) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Appid unknown");
+		return;
+	}
+
+
+	vector<string> acls = this->store->AppGetACL( appid );
+
+	Json::Value ret(Json::objectValue);
+
+	ret["acl"] = Json::Value(Json::arrayValue);
+
+	for( auto acl: acls )
+	{
+		ret["acl"].append(acl);
+	}
+	this->SendOK(client, cmd, ret);
+}
+
+void SecopServer::DoAppRemoveACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	//TODO: Access control!
+	ScopedLog l("Remove app ACL");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
+	{
+		return;
+	}
+
+	if( !cmd.isMember("acl") || !cmd["acl"].isString() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return;
+	}
+
+	string appid = cmd["appid"].asString();
+	string acl = cmd["acl"].asString();
+
+	if( !this->store->HasAppID( appid ) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "appid unknown");
+		return;
+	}
+
+	if( !this->store->AppHasACL(appid, acl) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "ACL not present");
+		return;
+	}
+
+	/* A user can remove a ACL if none of the following are true -
+	 *   User is not already in ACL
+	 *   Policy disallows user to always remove ACLs
+	 */
+
+	if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
+	{
+		if ( ! pc.Check(session["user"]["username"].asString() , "removeappacl") )
+		{
+			this->SendErrorMessage(client, cmd, 4, "Not allowed");
+			return;
+		}
+	}
+
+	this->store->AppRemoveAcl(appid, acl);
+
+	this->SendOK(client, cmd);
+
+}
+
+void SecopServer::DoAppHasACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Has app ACL");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
+	{
+		return;
+	}
+
+	if( !cmd.isMember("acl") || !cmd["acl"].isString() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return;
+	}
+	string appid = cmd["appid"].asString();
+	string acl = cmd["acl"].asString();
+
+	if( !this->store->HasAppID( appid ) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Appid unknown");
+		return;
+	}
+
+	Json::Value ret(Json::objectValue);
+	ret["hasacl"] = this->store->AppHasACL(appid, acl);
+
+	this->SendOK(client, cmd, ret);
+
+}
 
 void
 SecopServer::DoGetIdentifiers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)

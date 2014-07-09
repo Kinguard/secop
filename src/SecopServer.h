@@ -94,6 +94,10 @@ protected:
 	void DoAppAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoAppRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 
+	void DoAppAddACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoAppGetACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoAppRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoAppHasACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 
 private:
 	bool CheckArguments(UnixStreamClientSocketPtr& client, int what,const Json::Value& cmd);

@@ -34,7 +34,10 @@ public:
 	void AppUpdateIdentifiers(const string& appid, const Json::Value& val);
 
 	void AppAddAcl(const string& appid, const string& entity);
-
+	bool AppHasACL(const string& appid, const string& entity);
+	bool AppACLEmpty(const string& appid);
+	vector<string> AppGetACL(const string& appid);
+	void AppRemoveAcl(const string& appid, const string& entity);
 
 	bool HasUser(const string& user);
 	void CreateUser(const string& username, const string& displayname="");

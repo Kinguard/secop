@@ -183,6 +183,126 @@ void CryptoStorage::AppAddAcl(const string &appid, const string &entity)
 
 }
 
+bool CryptoStorage::AppHasACL(const string &appid, const string &entity)
+{
+	if( ! this->HasAppID( appid)  )
+	{
+		throw std::runtime_error("User unknown");
+	}
+
+	if( ! this->data["system"][appid].isMember("acl") )
+	{
+		return false;
+	}
+
+	if( ! this->data["system"][appid]["acl"].isArray() )
+	{
+		throw std::runtime_error("Malformed syntax in storage");
+	}
+
+	bool found = false;
+	for( auto x: this->data["system"][appid]["acl"] )
+	{
+		if( x.isString() && x.asString() == entity )
+		{
+			found = true;
+			break;
+		}
+	}
+	return found;
+}
+
+bool CryptoStorage::AppACLEmpty(const string &appid)
+{
+	if( ! this->HasAppID(appid)  )
+	{
+		throw std::runtime_error("User unknown");
+	}
+
+	if( ! this->data["system"][appid].isMember("acl") )
+	{
+		return true;
+	}
+
+	if( ! this->data["system"][appid]["acl"].isArray() )
+	{
+		throw std::runtime_error("Malformed syntax in storage");
+	}
+
+	return this->data["system"][appid]["acl"].size() == 0;
+
+}
+
+vector<string> CryptoStorage::AppGetACL(const string &appid)
+{
+	if( !this->HasAppID( appid ) )
+	{
+		throw std::runtime_error("Appid unknown");
+	}
+
+	if( this->data["system"][appid].isMember("acl") )
+	{
+		// Element is present, verify
+		if( ! this->data["system"][appid]["acl"].isArray() )
+		{
+			throw std::runtime_error("Malformed syntax in storage");
+		}
+	}
+	else
+	{
+		// Not present, create
+		this->data["system"][appid]["acl"]=Json::Value(Json::arrayValue);
+	}
+
+	vector<string> ret;
+	Json::Value acl = this->data["system"][appid]["acl"];
+	for( auto ent: acl)
+	{
+		if( ent.isString() )
+		{
+			ret.push_back(ent.asString());
+		}
+	}
+	return ret;
+
+}
+
+void CryptoStorage::AppRemoveAcl(const string &appid, const string &entity)
+{
+	if ( !this->HasAppID(appid) ) {
+		throw std::runtime_error("Appid unknown");
+	}
+
+	if( this->data["system"][appid].isMember("acl") )
+	{
+		// Element is present, verify
+		if( ! this->data["system"][appid]["acl"].isArray() )
+		{
+			throw std::runtime_error("Malformed syntax in storage");
+		}
+	}
+
+	Json::Value newArray(Json::arrayValue);
+	bool removed = false;
+	for( auto x: this->data["system"][appid]["acl"] )
+	{
+		if( x.isString() && x.asString() != entity )
+		{
+			newArray.append(x.asString() );
+		}
+		else
+		{
+			removed = true;
+		}
+	}
+
+	if( removed )
+	{
+		this->data["system"][appid]["acl"] = newArray;
+		this->Write();
+	}
+}
+
 CryptoStorage::~CryptoStorage ()
 {
 	this->Write();
@@ -359,14 +479,24 @@ CryptoStorage::RemoveAcl(const string &username, const string &service, const st
 	}
 
 	Json::Value newArray(Json::arrayValue);
+	bool removed = false;
 	for( auto x: this->data["user"][username]["services"][service]["acl"] )
 	{
 		if( x.isString() && x.asString() != entity )
 		{
 			newArray.append(x.asString() );
 		}
+		else
+		{
+			removed = true;
+		}
 	}
-	this->data["user"][username]["services"][service]["acl"] = newArray;
+
+	if( removed )
+	{
+		this->data["user"][username]["services"][service]["acl"] = newArray;
+		this->Write();
+	}
 }
 
 bool
@@ -382,8 +512,12 @@ CryptoStorage::ACLEmpty(const string &username, const string &service)
 		throw std::runtime_error("Service not found for user");
 	}
 
-	if( ! this->data["user"][username]["services"][service].isMember("acl")
-			|| ! this->data["user"][username]["services"][service]["acl"].isArray() )
+	if( ! this->data["user"][username]["services"][service].isMember("acl") )
+	{
+		return true;
+	}
+
+	if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
 	{
 		throw std::runtime_error("Malformed syntax in storage");
 	}
@@ -405,8 +539,12 @@ CryptoStorage::HasACL(const string &username, const string &service, const strin
 		throw std::runtime_error("Service not found for user");
 	}
 
-	if( ! this->data["user"][username]["services"][service].isMember("acl")
-			|| ! this->data["user"][username]["services"][service]["acl"].isArray() )
+	if( ! this->data["user"][username]["services"][service].isMember("acl") )
+	{
+		return false;
+	}
+
+	if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
 	{
 		throw std::runtime_error("Malformed syntax in storage");
 	}

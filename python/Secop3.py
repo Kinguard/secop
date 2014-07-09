@@ -186,4 +186,67 @@ class Secop(Client):
 		req["servicename"] = service
 		return self._dorequest(req,dump)
 
+	def addappid(self, appid, dump=defaultdump):
+		req = {}
+		req["cmd"]="createappid"
+		req["appid"] = appid
+		return self._dorequest(req,dump)
+
+	def getappids(self, dump=defaultdump):
+		req = {}
+		req["cmd"]="getappids"
+		return self._dorequest(req,dump)
+
+	def removeappid(self, appid, dump=defaultdump):
+		req = {}
+		req["cmd"]="removeappid"
+		req["appid"] = appid
+		return self._dorequest(req,dump)
+
+	def getappidentifiers(self, appid, dump=defaultdump):
+		req = {}
+		req["cmd"]="getappidentifiers"
+		req["appid"] = appid
+		return self._dorequest(req,dump)
+
+	def addappidentifier(self, appid, identifier, dump=defaultdump):
+		req = {}
+		req["cmd"]="addappidentifier"
+		req["appid"] = appid
+		req["identifier"] = identifier
+		return self._dorequest(req,dump)
+
+	def removeappidentifier(self, appid, identifier, dump=defaultdump):
+		req = {}
+		req["cmd"]="removeappidentifier"
+		req["appid"] = appid
+		req["identifier"] = identifier
+		return self._dorequest(req,dump)
+
+	def addappacl(self, appid, acl, dump=defaultdump):
+		req = {}
+		req["cmd"]="addappacl"
+		req["appid"] = appid
+		req["acl"] = acl
+		return self._dorequest(req,dump)
+
+	def getappacl(self, appid, dump=defaultdump):
+		req = {}
+		req["cmd"]="getappacl"
+		req["appid"] = appid
+		return self._dorequest(req,dump)
+
+	def removeappacl(self, appid, acl, dump=defaultdump):
+		req = {}
+		req["cmd"]="removeappacl"
+		req["appid"] = appid
+		req["acl"] = acl
+		return self._dorequest(req,dump)
+
+	def hasappacl(self, appid, acl, dump=defaultdump):
+		req = {}
+		req["cmd"]="hasappacl"
+		req["appid"] = appid
+		req["acl"] = acl
+		return self._dorequest(req,dump)
 
