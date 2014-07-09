@@ -43,6 +43,7 @@ using namespace Utils::Net;
 #define CHK_TID	0x02
 #define CHK_USR	0x04
 #define CHK_SRV	0x08
+#define CHK_APPID 0x10
 
 class SecopServer : public Utils::Net::NetServer
 {
@@ -84,12 +85,23 @@ protected:
 	void DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 
+
+	void DoCreateAppID(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGetAppIDs(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoRemoveAppID(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+
+	void DoAppGetIdentifiers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoAppAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoAppRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+
+
 private:
 	bool CheckArguments(UnixStreamClientSocketPtr& client, int what,const Json::Value& cmd);
 	static bool CheckAPIVersion(const Json::Value& cmd);
 	static bool CheckTID(const Json::Value& cmd);
 	static bool CheckUsername(const Json::Value& cmd);
 	static bool CheckService(const Json::Value& cmd);
+	static bool CheckAppID(const Json::Value &cmd);
 
 	void SendErrorMessage(UnixStreamClientSocketPtr& client, const Json::Value& cmd, int errcode, const string& msg);
 	void SendOK(UnixStreamClientSocketPtr& client, const Json::Value& cmd, const Json::Value& val = Json::nullValue);

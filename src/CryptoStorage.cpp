@@ -67,6 +67,122 @@ CryptoStorage::CryptoStorage (const string& path, const SecVector<byte>& key)
 	this->Initialize();
 }
 
+bool CryptoStorage::HasAppID(const string &appid)
+{
+	return this->data["system"].isMember(appid);
+}
+
+void CryptoStorage::CreateAppID(const string &appid)
+{
+	if( this->HasAppID(appid) )
+	{
+		throw std::runtime_error("Appid already exists");
+	}
+	this->data["system"][appid]["attributes"]=Json::nullValue;
+
+	this->Write();
+
+}
+
+void CryptoStorage::DeleteAppID(const string &appid)
+{
+	if( this->HasAppID( appid ) )
+	{
+		this->data["system"].removeMember(appid);
+	}
+	else
+	{
+		throw std::runtime_error("Appid not found");
+	}
+	this->Write();
+}
+
+vector<string> CryptoStorage::GetAppIDs()
+{
+	return this->data["system"].getMemberNames();
+}
+
+void CryptoStorage::AppAddIdentifier(const string &appid, const Json::Value &val)
+{
+	Json::Value ids = this->AppGetIdentifiers( appid );
+
+	ids.append(val);
+
+	this->AppUpdateIdentifiers( appid, ids );
+}
+
+Json::Value CryptoStorage::AppGetIdentifiers(const string &appid)
+{
+
+	if( this->data["system"][appid].isMember("identifiers") )
+	{
+		// Element is present, verify
+		if( ! this->data["system"][appid]["identifiers"].isString() )
+		{
+			throw std::runtime_error("Malformed syntax in storage");
+		}
+	}
+	else
+	{
+		// Not present, create
+		this->AppUpdateIdentifiers(appid, Json::Value(Json::arrayValue) );
+	}
+	return this->AppDecryptIdentifiers( appid );
+}
+
+void CryptoStorage::AppUpdateIdentifiers(const string &appid, const Json::Value &val)
+{
+
+	if( ! val.isArray() )
+	{
+		throw std::runtime_error("Identifiers not array");
+	}
+	this->AppEncryptIdentifiers(appid, val);
+
+	this->Write();
+
+}
+
+void CryptoStorage::AppAddAcl(const string &appid, const string &entity)
+{
+	if( !this->HasAppID( appid ) )
+	{
+		throw std::runtime_error("Appid unknown");
+	}
+
+	if( this->data["system"][appid].isMember("acl") )
+	{
+		// Element is present, verify
+		if( ! this->data["system"][appid]["acl"].isArray() )
+		{
+			throw std::runtime_error("Malformed syntax in storage");
+		}
+	}
+	else
+	{
+		// Not present, create
+		this->data["system"][appid]["acl"]=Json::Value(Json::arrayValue);
+	}
+
+	bool found = false;
+
+	for(auto v : this->data["system"][appid]["acl"] )
+	{
+		if( v.isString() && v.asString() == entity )
+		{
+			found = true;
+		}
+	}
+
+	if( ! found )
+	{
+		this->data["system"][appid]["acl"].append( Json::Value( entity ) );
+
+		this->Write();
+	}
+
+}
+
 CryptoStorage::~CryptoStorage ()
 {
 	this->Write();
@@ -531,6 +647,42 @@ CryptoStorage::EncryptIdentifiers(const string& username, const string& service,
 			);
 
 	this->data["user"][username]["services"][service]["identifiers"] = b64val;
+}
+
+Json::Value CryptoStorage::AppDecryptIdentifiers(const string &appid)
+{
+	vector<byte> iv;
+
+	Crypto::Base64Decode(this->data["system"][appid]["iv"].asString(), iv);
+
+	vector<byte> val;
+	Crypto::Base64Decode(this->data["system"][appid]["identifiers"].asString(), val);
+
+	this->idcrypto.Initialize(this->key, iv);
+	string ids = this->idcrypto.Decrypt(val);
+
+	Json::Value ret(Json::arrayValue);
+	this->reader.parse(ids, ret);
+
+	return ret;
+}
+
+void CryptoStorage::AppEncryptIdentifiers(const string &appid, const Json::Value &val)
+{
+	// Generate and save new IV
+	vector<byte> iv(AES::BLOCKSIZE);
+	this->rnd.GenerateBlock(&iv[0], iv.size() );
+
+	string b64iv = Crypto::Base64Encode( iv );
+	this->data["system"][appid]["iv"]=b64iv;
+
+	this->idcrypto.Initialize(this->key, iv);
+
+	string b64val = Crypto::Base64Encode(
+			this->idcrypto.Encrypt( this->writer.write(val) )
+			);
+
+	this->data["system"][appid]["identifiers"] = b64val;
 }
 
 

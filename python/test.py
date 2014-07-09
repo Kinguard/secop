@@ -319,6 +319,106 @@ class TestSecop(TestBase):
 		(status, res) = self.s.removeattribute("user","eyecolor")
 		self.assertFalse( status )
 
+	def test_8_appid(self):
+		# Initialise db
+		(status, res) = self.s.init("Secret password")
+		#Authenticate
+		(status, res) = self.s.sockauth()
+		self.assertTrue( status )
+
+		# Add appid
+		(status, res) = self.s.addappid("myappid")
+		self.assertTrue( status )
+
+		# Get appids
+		(status, res) = self.s.getappids()
+		self.assertTrue( status )
+		self.assertEqual( len(res["appids"]), 1 )
+
+		(status, res) = self.s.addappid("myappid")
+		self.assertFalse( status )
+
+		(status, res) = self.s.addappid("id2")
+		self.assertTrue( status )
+		(status, res) = self.s.getappids()
+		self.assertTrue( status )
+		self.assertEqual( len(res["appids"]), 2 )
+
+		#remove appid
+		(status, res) = self.s.removeappid("id2")
+		self.assertTrue( status )
+		(status, res) = self.s.getappids()
+		self.assertTrue( status )
+		self.assertEqual( len(res["appids"]), 1 )
+
+		(status, res) = self.s.removeappid("id2")
+		self.assertFalse( status )
+
+	def test_9_appidentifiers(self):
+		# Initialise db
+		(status, res) = self.s.init("Secret password")
+		#Authenticate
+		(status, res) = self.s.sockauth()
+		self.assertTrue( status )
+
+		# Add appid
+		(status, res) = self.s.addappid("myappid")
+		self.assertTrue( status )
+
+		# Add identifier
+		id = {}
+		id["user"]="user"
+		id["password"] = "S3cret"
+		id["service"] = "http://www.hotmail.com"
+		id["comment"] = "A test"
+		(status, res) = self.s.addappidentifier("myappid", id)
+		self.assertTrue( status )
+
+
+		#Get app identifiers
+		(status, res) = self.s.getappidentifiers("myappid")
+		self.assertTrue( status )
+
+		self.assertEqual( len(res["identifiers"]), 1)
+
+		rid = res["identifiers"][0]
+		self.assertEqual( rid["user"], id["user"] )
+		self.assertEqual( rid["password"], id["password"] )
+		self.assertEqual( rid["service"], id["service"] )
+		self.assertEqual( rid["comment"], id["comment"] )
+
+		rid["user"]="New name"
+		(status, res) = self.s.addappidentifier("myappid", rid)
+		self.assertTrue( status )
+
+		(status, res) = self.s.getappidentifiers("myappid")
+		self.assertTrue( status )
+
+		self.assertEqual( len(res["identifiers"]), 2)
+
+		(status, res) = self.s.addappidentifier("wrong appid", rid)
+		self.assertFalse( status )
+		(status, res) = self.s.addappidentifier("", rid)
+		self.assertFalse( status )
+
+		# Remove identifier
+		(status, res) = self.s.removeappidentifier("wrong appid", {})
+		self.assertFalse( status )
+
+		(status, res) = self.s.removeappidentifier("myappid", {})
+		self.assertFalse( status )
+
+		(status, res) = self.s.getappidentifiers("myappid")
+		self.assertTrue( status )
+		self.assertEqual( 2, len(res["identifiers"]))
+
+		(status, res) = self.s.removeappidentifier("myappid", {"user":"New name"})
+		self.assertTrue( status )
+
+		(status, res) = self.s.getappidentifiers("myappid")
+		self.assertTrue( status )
+		self.assertEqual( 1, len(res["identifiers"]))
+
 if __name__=='__main__':
 	print "Start"
 	unittest.main()

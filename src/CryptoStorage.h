@@ -24,6 +24,18 @@ public:
 	CryptoStorage (const string& path, const SecString& pwd);
 	CryptoStorage (const string& path, const SecVector<byte>& key);
 
+	bool HasAppID(const string& appid);
+	void CreateAppID(const string& appid);
+	void DeleteAppID(const string& appid);
+	vector<string> GetAppIDs(void);
+
+	void AppAddIdentifier(const string& appid, const Json::Value& val);
+	Json::Value AppGetIdentifiers(const string& appid);
+	void AppUpdateIdentifiers(const string& appid, const Json::Value& val);
+
+	void AppAddAcl(const string& appid, const string& entity);
+
+
 	bool HasUser(const string& user);
 	void CreateUser(const string& username, const string& displayname="");
 	void DeleteUser(const string& username);
@@ -61,6 +73,10 @@ private:
 
 	Json::Value DecryptIdentifiers(const string& username, const string& service);
 	void EncryptIdentifiers(const string& username, const string& service, const Json::Value& val);
+
+	Json::Value AppDecryptIdentifiers(const string& appid);
+	void AppEncryptIdentifiers(const string& appid, const Json::Value& val);
+
 
 	bool hasApplication(const string& app);
 private:

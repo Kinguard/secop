@@ -95,6 +95,18 @@ public:
 			{"tor", true} // For debug
 		};
 
+		dfl["createappid"]	= false;
+		pol["createappid"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["removeappid"]	= false;
+		pol["removeappid"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
 	}
 
 	bool Check(const string& actor, const string& policy )
@@ -117,7 +129,7 @@ public:
 		/* Check if user is mentioned */
 		if( this->pol[policy].find(actor) != this->pol[policy].end() )
 		{
-			ret = this-pol[policy][actor];
+			ret = this->pol[policy][actor];
 		}
 
 		return ret;
@@ -165,6 +177,16 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 	this->actions["addidentifier"]=make_pair(AUTHENTICATED, &SecopServer::DoAddIdentifier );
 	this->actions["removeidentifier"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveIdentifier );
 	this->actions["getidentifiers"]=make_pair(AUTHENTICATED, &SecopServer::DoGetIdentifiers );
+
+	this->actions["createappid"]=make_pair(AUTHENTICATED, &SecopServer::DoCreateAppID );
+	this->actions["getappids"]=make_pair(AUTHENTICATED, &SecopServer::DoGetAppIDs );
+	this->actions["removeappid"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveAppID );
+
+
+	this->actions["addappidentifier"]=make_pair(AUTHENTICATED, &SecopServer::DoAppAddIdentifier );
+	this->actions["getappidentifiers"]=make_pair(AUTHENTICATED, &SecopServer::DoAppGetIdentifiers );
+	this->actions["removeappidentifier"]=make_pair(AUTHENTICATED, &SecopServer::DoAppRemoveIdentifier );
+
 }
 
 void
@@ -287,6 +309,12 @@ SecopServer::CheckService(const Json::Value& cmd)
 	return !cmd.isNull() &&	cmd.isMember("servicename") && cmd["servicename"].isString();
 }
 
+inline bool
+SecopServer::CheckAppID(const Json::Value& cmd)
+{
+	return !cmd.isNull() &&	cmd.isMember("appid") && cmd["appid"].isString();
+}
+
 bool
 SecopServer::CheckArguments(UnixStreamClientSocketPtr &client, int what, const Json::Value& cmd)
 {
@@ -310,6 +338,12 @@ SecopServer::CheckArguments(UnixStreamClientSocketPtr &client, int what, const J
 	}
 
 	if( (what & CHK_SRV) && !SecopServer::CheckService(cmd) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return false;
+	}
+
+	if( (what & CHK_APPID) && !SecopServer::CheckAppID(cmd) )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return false;
@@ -1230,6 +1264,262 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 	this->store->UpdateIdentifiers(user, service, new_ids);
 
 	this->SendOK(client, cmd);
+}
+
+void SecopServer::DoCreateAppID(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Create appid");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
+	{
+		return;
+	}
+
+	if( ! pc.Check(session["user"]["username"].asString(), "createappid") )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
+		return;
+	}
+
+	string appid = cmd["appid"].asString();
+
+	if( this->store->HasAppID( appid ) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Appid already exists");
+		return;
+	}
+
+	this->store->CreateAppID(appid);
+
+	this->SendOK(client, cmd);
+
+}
+
+void SecopServer::DoGetAppIDs(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Get appids");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID, cmd) )
+	{
+		return;
+	}
+
+	vector<string> appids = this->store->GetAppIDs();
+
+	Json::Value ret(Json::objectValue);
+
+	for( auto appid: appids )
+	{
+		ret["appids"].append(appid);
+	}
+	this->SendOK(client, cmd, ret);
+
+}
+
+void SecopServer::DoRemoveAppID(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Remove appid");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
+	{
+		return;
+	}
+
+	if( ! pc.Check(session["user"]["username"].asString(), "removeappid") )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
+		return;
+	}
+
+	string appid = cmd["appid"].asString();
+
+	if( !this->store->HasAppID( appid ) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Unknown appid");
+		return;
+	}
+
+	this->store->DeleteAppID( appid );
+
+	this->SendOK(client, cmd);
+}
+
+void SecopServer::DoAppGetIdentifiers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	//TODO: Access control!
+
+	ScopedLog l("Get app identifiers");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID,  cmd) )
+	{
+		return;
+	}
+
+	string appid = cmd["appid"].asString();
+
+	if( ! this->store->HasAppID(appid) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "Appid unknown");
+		return;
+	}
+
+
+#if 0
+	TODO fix asap!
+	/* Todo, add policy check */
+	// Not empty and user not in ACL
+	if( ! this->store->ACLEmpty(user, service) &&
+			! this->store->HasACL(user, service, session["user"]["username"].asString() ) &&
+			! pc.Check(session["user"]["username"].asString(), "getidentifiers") )
+	{
+		this->SendErrorMessage(client, cmd, 4, "Access not allowed");
+		return;
+	}
+#endif
+
+	Json::Value ret(Json::objectValue);
+	ret["identifiers"] = this->store->AppGetIdentifiers( appid );
+
+	this->SendOK(client, cmd, ret);
+}
+
+void SecopServer::DoAppAddIdentifier(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Add app identifier");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
+	{
+		return;
+	}
+
+	string appid = cmd["appid"].asString();
+
+	if( ! this->store->HasAppID( appid) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "Appid unknown");
+		return;
+	}
+
+
+	if( !cmd.isMember("identifier") || !cmd["identifier"].isObject() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
+		return;
+	}
+
+#if 0
+	TODO: Fix asap!
+	/* A user is allowed to add an identifier if -
+	 * Policy gives global add capabilities
+	 * User is in ACL
+	 */
+
+	if( ! this->store->ACLEmpty(user, service) )
+	{
+		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		{
+			if ( ! pc.Check(session["user"]["username"].asString() , "addidentifier") )
+			{
+				this->SendErrorMessage(client, cmd, 4, "Not allowed");
+				return;
+			}
+		}
+	}
+#endif
+
+	this->store->AppAddIdentifier( appid, cmd["identifier"]);
+
+	this->SendOK(client, cmd);
+
+}
+
+void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Remove identifier");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
+	{
+		return;
+	}
+
+	string appid = cmd["appid"].asString();
+
+	if( ! this->store->HasAppID( appid) )
+	{
+		this->SendErrorMessage(client, cmd, 3, "Appid unknown");
+		return;
+	}
+
+	if( !cmd.isMember("identifier") || !cmd["identifier"].isObject() )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
+		return;
+	}
+
+#if 0
+	/* A user is allowed to remove an identifier if -
+	 * Policy gives global remove capabilities
+	 * User is in ACL
+	 */
+
+	if( ! this->store->ACLEmpty(user, service) )
+	{
+		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		{
+			if ( ! pc.Check(session["user"]["username"].asString() , "removeidentifier") )
+			{
+				this->SendErrorMessage(client, cmd, 4, "Not allowed");
+				return;
+			}
+		}
+	}
+#endif
+
+	Json::Value needle = cmd["identifier"];
+	Json::Value ids = this->store->AppGetIdentifiers( appid );
+	Json::Value new_ids(Json::arrayValue);
+
+	bool id_removed = false;
+	// For each identifier for appid
+	for( auto id: ids)
+	{
+		bool found = false;
+
+		//For each key/value in search arg
+
+		Json::Value::Members ms = needle.getMemberNames();
+
+		for( auto m: ms)
+		{
+			// Member exists in current identifier?
+			if( id.isMember( m ) )
+			{
+				if( id[m].asString() == needle[m].asString() )
+				{
+					// Found match!
+					found = true;
+					id_removed = true;
+				}
+			}
+		}
+
+		if( ! found )
+		{
+			// Not found, append to new list
+			new_ids.append( id );
+		}
+	}
+
+	this->store->AppUpdateIdentifiers(appid, new_ids);
+
+	if( id_removed )
+	{
+		this->SendOK(client, cmd);
+	}
+	else
+	{
+		this->SendErrorMessage(client, cmd,3, "Identifier not found");
+	}
 }
 
 
