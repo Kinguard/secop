@@ -1,3 +1,9 @@
+secop (0.9.3) testing; urgency=low
+
+  * Add implementation for appid system storage 
+
+ -- Tor Krill <tor@openproducts.se>  Thu, 10 Jul 2014 11:26:47 +0200
+
 secop (0.9.2) testing; urgency=low
 
   * Dont start at boot. (opi-control will start daemons)
