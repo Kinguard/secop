@@ -11,6 +11,8 @@
 #include <libutils/Socket.h>
 #include <libutils/Logger.h>
 
+#include <pthread.h>
+
 #include <map>
 
 using namespace std;
@@ -172,6 +174,13 @@ public:
 
 static PolicyController pc;
 
+
+struct threadinfo
+{
+	SecopServer* server;
+	SocketPtr client;
+};
+
 SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 		state(UNINITIALIZED),
 		Utils::Net::NetServer(UnixStreamServerSocketPtr( new UnixStreamServerSocket(socketpath)), 0),
@@ -182,7 +191,7 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 	// Setup commands possible
 	this->actions["init"]=make_pair(UNINITIALIZED, &SecopServer::DoInitialize);
 	this->actions["status"]=make_pair(UNINITIALIZED|INITIALIZED|AUTHENTICATED, &SecopServer::DoStatus);
-	this->actions["auth"]=make_pair(INITIALIZED, &SecopServer::DoAuthenticate );
+	this->actions["auth"]=make_pair(INITIALIZED|AUTHENTICATED, &SecopServer::DoAuthenticate );
 
 	this->actions["createuser"]=make_pair(AUTHENTICATED, &SecopServer::DoCreateUser );
 	this->actions["removeuser"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveUser );
@@ -227,21 +236,24 @@ SecopServer::Dispatch ( SocketPtr con )
 {
 	ScopedLog l("Dispatch");
 
+#if 1
+
+	struct threadinfo* tin = new threadinfo( {this, con });
+	pthread_t thread;
+
+	pthread_create( &thread, nullptr, SecopServer::ClientThread, tin);
+
+	pthread_detach( thread );
+
+#else
 	// Convert into unixsocket
 	UnixStreamClientSocketPtr sock = static_pointer_cast<UnixStreamClientSocket>(con);
 
 	char buf[64*1024];
 	size_t rd;
 
-	// Reset possible state left over from last session
-
 	Json::Value session;
 	session["user"]["authenticated"]=false;
-
-	if( this->state == AUTHENTICATED )
-	{
-		this->state = INITIALIZED;
-	}
 
 	try
 	{
@@ -276,16 +288,24 @@ SecopServer::Dispatch ( SocketPtr con )
 	// Make sure user is "logged out"
 
 	this->decreq();
+#endif
 }
 
 void
 SecopServer::ProcessOneCommand ( UnixStreamClientSocketPtr& client,
 		Json::Value& cmd, Json::Value& session )
 {
+	ScopedLock l(this->biglock);
+
 	string action = cmd["cmd"].asString();
+
+	logg << Logger::Debug << "Process request of "<< action << lend;
 	if( this->actions.find(action) != this->actions.end() )
 	{
-		if( this->state & this->actions[action].first )
+		unsigned char valid_states = this->actions[action].first;
+
+		if( this->state & valid_states ||
+				( ( valid_states & AUTHENTICATED) && session["user"]["authenticated"].asBool() ))
 		{
 			try
 			{
@@ -423,6 +443,64 @@ SecopServer::SendOK (UnixStreamClientSocketPtr& client, const Json::Value& cmd, 
 	}
 
 	this->SendReply(client, ret);
+}
+
+void SecopServer::HandleClient(UnixStreamClientSocketPtr client)
+{
+	char buf[64*1024];
+	size_t rd;
+
+	Json::Value session;
+	session["user"]["authenticated"]=false;
+
+	try
+	{
+		while( (rd = client->Read(buf, sizeof(buf))) > 0 )
+		{
+			logg << "Read request of socket"<<lend;
+			Json::Value req;
+			if( this->reader.parse(buf, req) )
+			{
+				if( req.isMember("cmd") && req["cmd"].isString() )
+				{
+					this->ProcessOneCommand(client, req, session);
+				}
+				else
+				{
+					this->SendErrorMessage(client, Json::Value::null, 4, "Missing command in request");
+					break;
+				}
+			}
+			else
+			{
+				this->SendErrorMessage(client, Json::Value::null, 4, "Unable to parse request");
+				break;
+			}
+		}
+	}
+	catch(Utils::ErrnoException& e)
+	{
+		logg << Logger::Debug << "Caught exception on socket read ("<<e.what()<<")"<<lend;
+	}
+
+	// Make sure user is "logged out"
+	this->decreq();
+}
+
+void *SecopServer::ClientThread(void *obj)
+{
+	struct threadinfo* tinfo =  static_cast< struct threadinfo* >(obj);
+
+	// Convert into unixsocket
+	UnixStreamClientSocketPtr sock = static_pointer_cast<UnixStreamClientSocket>(tinfo->client);
+
+	tinfo->server->HandleClient( sock );
+
+	tinfo->client.reset();
+
+	delete tinfo;
+
+	return NULL;
 }
 
 
@@ -584,7 +662,7 @@ SecopServer::DoAuthenticate ( UnixStreamClientSocketPtr& client,
 		return;
 	}
 	session["user"]["authenticated"]=true;
-	this->state = AUTHENTICATED;
+
 	this->SendOK(client, cmd);
 }
 

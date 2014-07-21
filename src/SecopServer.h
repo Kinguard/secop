@@ -13,6 +13,7 @@
 #include <map>
 
 #include <libutils/NetServer.h>
+#include <libutils/Mutex.h>
 
 #include "json/json.h"
 #include "CryptoStorage.h"
@@ -109,6 +110,11 @@ private:
 
 	void SendErrorMessage(UnixStreamClientSocketPtr& client, const Json::Value& cmd, int errcode, const string& msg);
 	void SendOK(UnixStreamClientSocketPtr& client, const Json::Value& cmd, const Json::Value& val = Json::nullValue);
+
+
+	Utils::Mutex biglock;
+	void HandleClient(UnixStreamClientSocketPtr client);
+	static void* ClientThread(void* obj);
 
 	unsigned char state;
 	CryptoStoragePtr store;
