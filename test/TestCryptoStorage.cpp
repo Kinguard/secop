@@ -49,6 +49,41 @@ void TestCryptoStorage::TestUser()
 	CPPUNIT_ASSERT( ! c.HasUser("test") );
 }
 
+void TestCryptoStorage::TestGroup()
+{
+	CryptoStorage c("/tmp/cstest.db","My Password");
+
+	CPPUNIT_ASSERT_EQUAL( (size_t) 0, c.GroupsGet().size() );
+
+	CPPUNIT_ASSERT( ! c.HasGroup("test") );
+	CPPUNIT_ASSERT_NO_THROW( c.GroupAdd("test") );
+	CPPUNIT_ASSERT( c.HasGroup("test") );
+
+	CPPUNIT_ASSERT_EQUAL( (size_t) 1, c.GroupsGet().size() );
+	CPPUNIT_ASSERT_NO_THROW( c.GroupAdd("test2") );
+	CPPUNIT_ASSERT_EQUAL( (size_t) 2, c.GroupsGet().size() );
+	CPPUNIT_ASSERT_NO_THROW( c.GroupRemove("test2") );
+	CPPUNIT_ASSERT_EQUAL( (size_t) 1, c.GroupsGet().size() );
+
+	CPPUNIT_ASSERT_THROW( c.GroupAddMember("Nogroup","mem1"), std::runtime_error );
+	CPPUNIT_ASSERT_NO_THROW( c.GroupAddMember("test", "mem1") );
+	CPPUNIT_ASSERT_NO_THROW( c.GroupAddMember("test", "mem1") );
+
+	CPPUNIT_ASSERT_EQUAL( (size_t) 1, c.GroupGetMembers("test").size() );
+	CPPUNIT_ASSERT_NO_THROW( c.GroupAddMember("test", "mem2") );
+	CPPUNIT_ASSERT_EQUAL( (size_t) 2, c.GroupGetMembers("test").size() );
+
+	CPPUNIT_ASSERT_THROW( c.GroupRemoveMember("Nogroup","mem1"), std::runtime_error );
+	CPPUNIT_ASSERT_NO_THROW( c.GroupRemoveMember("test", "mem1") );
+	CPPUNIT_ASSERT_EQUAL( (size_t) 1, c.GroupGetMembers("test").size() );
+	CPPUNIT_ASSERT_NO_THROW( c.GroupRemoveMember("test", "mem1") );
+
+	CPPUNIT_ASSERT_THROW( c.GroupRemove("Nogroup"), std::runtime_error );
+	CPPUNIT_ASSERT_NO_THROW( c.GroupRemove("test") );
+	CPPUNIT_ASSERT_THROW( c.GroupRemove("test"), std::runtime_error );
+
+}
+
 void TestCryptoStorage::TestService()
 {
 	CryptoStorage c("/tmp/cstest.db","My Password");
@@ -156,7 +191,7 @@ void TestCryptoStorage::TestAttributes()
 	CPPUNIT_ASSERT_THROW( c.GetAttribute("wronguser","noattr"), std::runtime_error);
 	CPPUNIT_ASSERT_THROW( c.GetAttribute("wronguser",""), std::runtime_error);
 
-	CPPUNIT_ASSERT_THROW( c.AddAttribute("test", "displayname", "No Nam"), std::runtime_error );
+	CPPUNIT_ASSERT_NO_THROW( c.AddAttribute("test", "displayname", "No Nam") );
 	string aval = "green";
 	CPPUNIT_ASSERT_NO_THROW( c.AddAttribute("test", "eyecolor", aval) );
 	CPPUNIT_ASSERT( c.HasAttribute("test","eyecolor") );

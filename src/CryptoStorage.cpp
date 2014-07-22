@@ -28,6 +28,7 @@ void CryptoStorage::New()
 	this->data.clear();
 
 	this->data["user"]=Json::nullValue;
+	this->data["group"]=Json::nullValue;
 	this->data["system"]=Json::nullValue;
 	this->data["config"]["version"]=this->version;
 
@@ -100,6 +101,106 @@ void CryptoStorage::DeleteAppID(const string &appid)
 vector<string> CryptoStorage::GetAppIDs()
 {
 	return this->data["system"].getMemberNames();
+}
+
+bool CryptoStorage::HasGroup(const string &group)
+{
+	return this->data["group"].isMember(group);
+}
+
+void CryptoStorage::GroupAdd(const string &group)
+{
+	if( this->HasGroup( group ) )
+	{
+		throw std::runtime_error("Group exists");
+	}
+	this->data["group"][group]=Json::arrayValue;
+	this->Write();
+}
+
+vector<string> CryptoStorage::GroupsGet()
+{
+	return this->data["group"].getMemberNames();
+}
+
+void CryptoStorage::GroupAddMember(const string &group, const string &member)
+{
+	if( ! this->HasGroup( group ) )
+	{
+		throw std::runtime_error("Group doesn't' exists");
+	}
+
+	Json::Value members = this->data["group"][group];
+
+	bool found = false;
+	for_each(members.begin(), members.end(),
+			 [&found, member](Json::Value v){ if(v.asString() == member ){ found=true;}}
+	);
+
+	if( ! found )
+	{
+		members.append(member);
+		this->data["group"][group] = members;
+		this->Write();
+	}
+}
+
+void CryptoStorage::GroupRemoveMember(const string &group, const string &member)
+{
+	if( ! this->HasGroup( group ) )
+	{
+		throw std::runtime_error("Group doesn't' exists");
+	}
+
+	Json::Value members = this->data["group"][group];
+	Json::Value replace(Json::arrayValue);
+
+	bool removed = false;
+	for(auto mem: members)
+	{
+		if( mem.asString() != member )
+		{
+			replace.append(mem);
+		}
+		else
+		{
+			removed = true;
+		}
+	}
+
+	if( removed )
+	{
+		this->data["group"][group] = replace;
+		this->Write();
+	}
+}
+
+vector<string> CryptoStorage::GroupGetMembers(const string &group)
+{
+	if( ! this->HasGroup( group ) )
+	{
+		throw std::runtime_error("Group doesn't' exists");
+	}
+
+	vector<string> ret;
+
+	Json::Value members = this->data["group"][group];
+	for(auto member: members)
+	{
+		ret.push_back( member.asString() );
+	}
+	return ret;
+}
+
+void CryptoStorage::GroupRemove(const string &group)
+{
+	if( ! this->HasGroup( group ) )
+	{
+		throw std::runtime_error("Group doesn't' exists");
+	}
+
+	this->data["group"].removeMember(group);
+	this->Write();
 }
 
 void CryptoStorage::AppAddIdentifier(const string &appid, const Json::Value &val)
@@ -708,11 +809,6 @@ void CryptoStorage::AddAttribute(const string &username, const string &attribute
 	if( ! this->HasUser(username) )
 	{
 		throw std::runtime_error("User not found");
-	}
-
-	if( this->HasAttribute(username, attributename) )
-	{
-		throw std::runtime_error("Attribute already exists");
 	}
 
 	this->data["user"][username]["attributes"][attributename]=attributevalue;

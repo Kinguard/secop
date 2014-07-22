@@ -45,6 +45,8 @@ using namespace Utils::Net;
 #define CHK_USR	0x04
 #define CHK_SRV	0x08
 #define CHK_APPID 0x10
+#define CHK_GRP 0x20
+#define CHK_MEM 0x40
 
 class SecopServer : public Utils::Net::NetServer
 {
@@ -65,6 +67,7 @@ protected:
 
 	void DoCreateUser(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoRemoveUser(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoUpdatePassword(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoGetUsers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 
 	void DoAddAttribute(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
@@ -85,6 +88,13 @@ protected:
 	void DoGetIdentifiers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+
+	void DoGroupAdd(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGroupsGet(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGroupAddMember(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGroupRemoveMember(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGroupGetMembers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGroupRemove(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 
 
 	void DoCreateAppID(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
@@ -107,6 +117,8 @@ private:
 	static bool CheckUsername(const Json::Value& cmd);
 	static bool CheckService(const Json::Value& cmd);
 	static bool CheckAppID(const Json::Value &cmd);
+	static bool CheckGroup(const Json::Value &cmd);
+	static bool CheckMember(const Json::Value &cmd);
 
 	void SendErrorMessage(UnixStreamClientSocketPtr& client, const Json::Value& cmd, int errcode, const string& msg);
 	void SendOK(UnixStreamClientSocketPtr& client, const Json::Value& cmd, const Json::Value& val = Json::nullValue);

@@ -109,6 +109,43 @@ class Secop(Client):
 		req["attribute"] = attribute
 		return self._dorequest(req,dump)
 
+	def addgroup(self, group, dump=defaultdump):
+		req = {}
+		req["cmd"]="groupadd"
+		req["group"] = group
+		return self._dorequest(req,dump)
+
+	def addgroupmember(self, group, member, dump=defaultdump):
+		req = {}
+		req["cmd"]="groupaddmember"
+		req["group"] = group
+		req["member"] = member
+		return self._dorequest(req,dump)
+
+	def getgroups(self, dump=defaultdump):
+		req = {}
+		req["cmd"]="groupsget"
+		return self._dorequest(req,dump)
+
+	def removegroupmember(self, group, member, dump=defaultdump):
+		req = {}
+		req["cmd"]="groupremovemember"
+		req["group"] = group
+		req["member"] = member
+		return self._dorequest(req,dump)
+
+	def getgroupmembers(self, group, dump=defaultdump):
+		req = {}
+		req["cmd"]="groupgetmembers"
+		req["group"] = group
+		return self._dorequest(req,dump)
+
+	def removegroup(self, group, dump=defaultdump):
+		req = {}
+		req["cmd"]="groupremove"
+		req["group"] = group
+		return self._dorequest(req,dump)
+
 	def getservices(self, user, dump=defaultdump):
 		req = {}
 		req["cmd"]="getservices"

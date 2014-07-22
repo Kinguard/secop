@@ -138,6 +138,30 @@ public:
 			{"root",true},
 			{"tor", true} // For debug
 		};
+
+		dfl["addgroup"]	= false;
+		pol["addgroup"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["addgroupmember"]	= false;
+		pol["addgroupmember"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["removegroupmember"]	= false;
+		pol["removegroupmember"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
+
+		dfl["removegroup"]	= false;
+		pol["removegroup"]	= {
+			{"root",true},
+			{"tor", true} // For debug
+		};
 	}
 
 	bool Check(const string& actor, const string& policy )
@@ -196,6 +220,7 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 	this->actions["createuser"]=make_pair(AUTHENTICATED, &SecopServer::DoCreateUser );
 	this->actions["removeuser"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveUser );
 	this->actions["getusers"]=make_pair(AUTHENTICATED, &SecopServer::DoGetUsers );
+	this->actions["updatepassword"]=make_pair(AUTHENTICATED, &SecopServer::DoUpdatePassword );
 
 	this->actions["getattributes"] = make_pair(AUTHENTICATED, &SecopServer::DoGetAttributes );
 	this->actions["getattribute"] = make_pair(AUTHENTICATED, &SecopServer::DoGetAttribute );
@@ -211,6 +236,12 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 	this->actions["removeacl"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveACL );
 	this->actions["hasacl"]=make_pair(AUTHENTICATED, &SecopServer::DoHasACL );
 
+	this->actions["groupadd"]=make_pair(AUTHENTICATED, &SecopServer::DoGroupAdd );
+	this->actions["groupsget"]=make_pair(AUTHENTICATED, &SecopServer::DoGroupsGet );
+	this->actions["groupaddmember"]=make_pair(AUTHENTICATED, &SecopServer::DoGroupAddMember );
+	this->actions["groupremovemember"]=make_pair(AUTHENTICATED, &SecopServer::DoGroupRemoveMember );
+	this->actions["groupgetmembers"]=make_pair(AUTHENTICATED, &SecopServer::DoGroupGetMembers );
+	this->actions["groupremove"]=make_pair(AUTHENTICATED, &SecopServer::DoGroupRemove );
 
 	this->actions["addidentifier"]=make_pair(AUTHENTICATED, &SecopServer::DoAddIdentifier );
 	this->actions["removeidentifier"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveIdentifier );
@@ -368,6 +399,16 @@ SecopServer::CheckAppID(const Json::Value& cmd)
 	return !cmd.isNull() &&	cmd.isMember("appid") && cmd["appid"].isString();
 }
 
+bool SecopServer::CheckGroup(const Json::Value &cmd)
+{
+	return !cmd.isNull() &&	cmd.isMember("group") && cmd["group"].isString();
+}
+
+bool SecopServer::CheckMember(const Json::Value &cmd)
+{
+	return !cmd.isNull() &&	cmd.isMember("member") && cmd["member"].isString();
+}
+
 bool
 SecopServer::CheckArguments(UnixStreamClientSocketPtr &client, int what, const Json::Value& cmd)
 {
@@ -397,6 +438,18 @@ SecopServer::CheckArguments(UnixStreamClientSocketPtr &client, int what, const J
 	}
 
 	if( (what & CHK_APPID) && !SecopServer::CheckAppID(cmd) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return false;
+	}
+
+	if( (what & CHK_GRP) && !SecopServer::CheckGroup(cmd) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return false;
+	}
+
+	if( (what & CHK_MEM) && !SecopServer::CheckMember(cmd) )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return false;
@@ -746,6 +799,12 @@ SecopServer::DoRemoveUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 
 }
 
+void SecopServer::DoUpdatePassword(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Update password");
+
+}
+
 void
 SecopServer::DoGetUsers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
 {
@@ -800,12 +859,6 @@ void SecopServer::DoAddAttribute(UnixStreamClientSocketPtr &client, Json::Value 
 
 	string attribute = cmd["attribute"].asString();
 	string value = cmd["value"].asString();
-
-	if( this->store->HasAttribute(user, attribute ) )
-	{
-		this->SendErrorMessage(client, cmd, 2, "Attribute exists");
-		return;
-	}
 
 	this->store->AddAttribute(user, attribute, value );
 
@@ -1373,6 +1426,144 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 	}
 
 	this->store->UpdateIdentifiers(user, service, new_ids);
+
+	this->SendOK(client, cmd);
+}
+
+void SecopServer::DoGroupAdd(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Add group");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_GRP, cmd) )
+	{
+		return;
+	}
+
+	if( ! pc.Check(session["user"]["username"].asString(), "addgroup") )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
+		return;
+	}
+
+	string group = cmd["group"].asString();
+	this->store->GroupAdd(group);
+
+	this->SendOK(client, cmd);
+}
+
+void SecopServer::DoGroupsGet(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Get groups");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID, cmd) )
+	{
+		return;
+	}
+
+	//Todo: Should we have any policy on this?
+
+
+	vector<string> groups = this->store->GroupsGet();
+
+	Json::Value ret(Json::objectValue);
+	ret["groups"]=Json::arrayValue;
+	for(auto group: groups)
+	{
+		ret["groups"].append(group);
+	}
+
+	this->SendOK(client, cmd, ret);
+}
+
+void SecopServer::DoGroupAddMember(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Add group member");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_GRP | CHK_MEM, cmd) )
+	{
+		return;
+	}
+
+	if( ! pc.Check(session["user"]["username"].asString(), "addgroupmember") )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
+		return;
+	}
+
+	string group = cmd["group"].asString();
+	string member = cmd["member"].asString();
+
+	this->store->GroupAddMember(group, member);
+
+	this->SendOK(client, cmd);
+}
+
+void SecopServer::DoGroupRemoveMember(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Add group member");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_GRP | CHK_MEM, cmd) )
+	{
+		return;
+	}
+
+	if( ! pc.Check(session["user"]["username"].asString(), "removegroupmember") )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
+		return;
+	}
+
+	string group = cmd["group"].asString();
+	string member = cmd["member"].asString();
+
+	this->store->GroupRemoveMember(group, member);
+
+	this->SendOK(client, cmd);
+
+}
+
+void SecopServer::DoGroupGetMembers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Get group members");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_GRP, cmd) )
+	{
+		return;
+	}
+
+	//Todo: Should we have any policy on this?
+
+	string group = cmd["group"].asString();
+
+	vector<string> members = this->store->GroupGetMembers(group);
+
+	Json::Value ret(Json::objectValue);
+	ret["members"]=Json::arrayValue;
+	for(auto member: members)
+	{
+		ret["members"].append(member);
+	}
+
+	this->SendOK(client, cmd, ret);
+}
+
+void SecopServer::DoGroupRemove(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Remove group");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_GRP, cmd) )
+	{
+		return;
+	}
+
+	if( ! pc.Check(session["user"]["username"].asString(), "removegroup") )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
+		return;
+	}
+
+	string group = cmd["group"].asString();
+	this->store->GroupRemove(group);
 
 	this->SendOK(client, cmd);
 }

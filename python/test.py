@@ -117,7 +117,68 @@ class TestSecop(TestBase):
 		self.assertTrue( status )
 		self.assertEqual( len(res["users"]),1)
 
-	def test_04_services(self):
+	def test_04_groups(self):
+		# Initialise db
+		(status, res) = self.s.init("Secret password")
+		self.assertTrue( status )
+		self.assertEqual( res["status"]["value"], 0)
+
+		#Authenticate
+		(status, res) = self.s.sockauth()
+		self.assertTrue( status )
+
+		(status, res) = self.s.getgroups()
+		self.assertTrue( status )
+		self.assertEqual(0, len(res["groups"]) )
+
+		(status, res) = self.s.addgroup("test")
+		self.assertTrue( status )
+		(status, res) = self.s.getgroups()
+		self.assertTrue( status )
+		self.assertEqual(1, len(res["groups"]) )
+
+		(status, res) = self.s.addgroup("test2")
+		self.assertTrue( status )
+		(status, res) = self.s.getgroups()
+		self.assertTrue( status )
+		self.assertEqual(2, len(res["groups"]) )
+
+		(status, res) = self.s.removegroup("Notest")
+		self.assertFalse( status )
+
+		(status, res) = self.s.removegroup("test2")
+		self.assertTrue( status )
+		(status, res) = self.s.getgroups()
+		self.assertTrue( status )
+		self.assertEqual(1, len(res["groups"]) )
+
+		(status, res) = self.s.addgroupmember("NoGroup","mem1")
+		self.assertFalse( status )
+
+		(status, res) = self.s.addgroupmember("test","mem1")
+		self.assertTrue( status )
+
+		(status, res) = self.s.getgroupmembers("test")
+		self.assertTrue( status )
+		self.assertEqual(1, len(res["members"]) )
+		(status, res) = self.s.addgroupmember("test","mem2")
+		self.assertTrue( status )
+		(status, res) = self.s.getgroupmembers("test")
+		self.assertTrue( status )
+		self.assertEqual(2, len(res["members"]) )
+
+		(status, res) = self.s.getgroupmembers("NoGroup")
+		self.assertFalse( status )
+
+		(status, res) = self.s.removegroup("test")
+		self.assertTrue( status )
+		(status, res) = self.s.getgroups()
+		self.assertTrue( status )
+		self.assertEqual(0, len(res["groups"]) )
+
+
+
+	def test_05_services(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		self.assertTrue( status )
@@ -148,7 +209,7 @@ class TestSecop(TestBase):
 		(status, res) = self.s.getservices("user")
 		self.assertEqual( len(res["services"]), 1)
 
-	def test_05_identifiers(self):
+	def test_06_identifiers(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -207,11 +268,11 @@ class TestSecop(TestBase):
 		# Remove service
 		(status, res) = self.s.removeservice("user","myservice")
 		self.assertTrue( status )
-		# Remove user		
+		# Remove user
 		(status, res) = self.s.removeuser("user")
 		self.assertTrue( status )
 
-	def test_06_acl(self):
+	def test_07_acl(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -273,11 +334,11 @@ class TestSecop(TestBase):
 		# Remove service
 		(status, res) = self.s.removeservice("user","myservice")
 		self.assertTrue( status )
-		# Remove user		
+		# Remove user
 		(status, res) = self.s.removeuser("user")
 		self.assertTrue( status )
 
-	def test_07_attr(self):
+	def test_08_attr(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -305,7 +366,7 @@ class TestSecop(TestBase):
 		self.assertTrue( status )
 		self.assertEqual( len(res["attributes"]), 2 )
 		(status, res) = self.s.addattribute("user","eyecolor","green")
-		self.assertFalse( status )
+		self.assertTrue( status )
 		(status, res) = self.s.addattribute("nouser","eyecolor","green")
 		self.assertFalse( status )
 		#Remove attribute
@@ -319,7 +380,7 @@ class TestSecop(TestBase):
 		(status, res) = self.s.removeattribute("user","eyecolor")
 		self.assertFalse( status )
 
-	def test_08_appid(self):
+	def test_09_appid(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -354,7 +415,7 @@ class TestSecop(TestBase):
 		(status, res) = self.s.removeappid("id2")
 		self.assertFalse( status )
 
-	def test_09_appidentifiers(self):
+	def test_10_appidentifiers(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate
@@ -419,7 +480,7 @@ class TestSecop(TestBase):
 		self.assertTrue( status )
 		self.assertEqual( 1, len(res["identifiers"]))
 
-	def test_10_appacl(self):
+	def test_11_appacl(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
 		#Authenticate

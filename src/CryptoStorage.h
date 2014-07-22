@@ -29,6 +29,14 @@ public:
 	void DeleteAppID(const string& appid);
 	vector<string> GetAppIDs(void);
 
+	bool HasGroup(const string& group);
+	void GroupAdd(const string& group);
+	vector<string> GroupsGet( );
+	void GroupAddMember( const string& group, const string& member);
+	void GroupRemoveMember( const string& group, const string& member);
+	vector<string> GroupGetMembers( const string& group);
+	void GroupRemove( const string& group);
+
 	void AppAddIdentifier(const string& appid, const Json::Value& val);
 	Json::Value AppGetIdentifiers(const string& appid);
 	void AppUpdateIdentifiers(const string& appid, const Json::Value& val);

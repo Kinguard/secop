@@ -8,6 +8,7 @@ class TestCryptoStorage: public CppUnit::TestFixture
 	CPPUNIT_TEST_SUITE( TestCryptoStorage ); 
 	CPPUNIT_TEST( TestBasic );
 	CPPUNIT_TEST( TestUser );
+	CPPUNIT_TEST( TestGroup );
 	CPPUNIT_TEST( TestService );
 	CPPUNIT_TEST( TestACL );
 	CPPUNIT_TEST( TestIdentifiers );
@@ -21,6 +22,7 @@ public:
 	 
 	void TestBasic();
 	void TestUser();
+	void TestGroup();
 	void TestService();
 	void TestACL();
 	void TestIdentifiers();
