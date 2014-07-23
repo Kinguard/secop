@@ -1500,7 +1500,7 @@ void SecopServer::DoGroupAddMember(UnixStreamClientSocketPtr &client, Json::Valu
 
 void SecopServer::DoGroupRemoveMember(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
 {
-	ScopedLog l("Add group member");
+	ScopedLog l("Remove group member");
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_GRP | CHK_MEM, cmd) )
 	{
