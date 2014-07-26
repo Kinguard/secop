@@ -47,6 +47,7 @@ using namespace Utils::Net;
 #define CHK_APPID 0x10
 #define CHK_GRP 0x20
 #define CHK_MEM 0x40
+#define CHK_PWD 0x80
 
 class SecopServer : public Utils::Net::NetServer
 {
@@ -115,10 +116,14 @@ private:
 	static bool CheckAPIVersion(const Json::Value& cmd);
 	static bool CheckTID(const Json::Value& cmd);
 	static bool CheckUsername(const Json::Value& cmd);
+	static bool CheckPassword(const Json::Value &cmd);
 	static bool CheckService(const Json::Value& cmd);
 	static bool CheckAppID(const Json::Value &cmd);
 	static bool CheckGroup(const Json::Value &cmd);
 	static bool CheckMember(const Json::Value &cmd);
+
+	bool IsAdmin(const string& user);
+	bool AdminOrAllowed(const string& user, const string& policy);
 
 	void SendErrorMessage(UnixStreamClientSocketPtr& client, const Json::Value& cmd, int errcode, const string& msg);
 	void SendOK(UnixStreamClientSocketPtr& client, const Json::Value& cmd, const Json::Value& val = Json::nullValue);

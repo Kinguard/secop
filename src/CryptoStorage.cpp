@@ -28,7 +28,10 @@ void CryptoStorage::New()
 	this->data.clear();
 
 	this->data["user"]=Json::nullValue;
+
 	this->data["group"]=Json::nullValue;
+	this->data["group"]["admin"]=Json::arrayValue;
+
 	this->data["system"]=Json::nullValue;
 	this->data["config"]["version"]=this->version;
 
@@ -201,6 +204,26 @@ void CryptoStorage::GroupRemove(const string &group)
 
 	this->data["group"].removeMember(group);
 	this->Write();
+}
+
+bool CryptoStorage::GroupHasMember(const string &group, const string &member)
+{
+	if( ! this->HasGroup( group ) )
+	{
+		throw std::runtime_error("Group doesn't' exists");
+	}
+
+	bool found = false;
+	Json::Value members = this->data["group"][group];
+	for(auto mem: members)
+	{
+		if( mem.asString() == member )
+		{
+			found = true;
+		}
+	}
+
+	return found;
 }
 
 void CryptoStorage::AppAddIdentifier(const string &appid, const Json::Value &val)

@@ -49,119 +49,32 @@ class PolicyController
 public:
 	PolicyController()
 	{
-		dfl["createuser"]	= false;
-		pol["createuser"]	= {
-			{"root",true},
-			{"tor", true} // For debug
+		pol["createuser"]			= {};
+		pol["removeuser"]			= {};
+		pol["removeservice"]		= {};
+		pol["addacl"]				= {};
+		pol["removeacl"]			= {};
+		pol["addidentifier"]		= {};
+		pol["removeidentifier"]		= {};
+		pol["getidentifiers"]		= {};
+		pol["createappid"]			= {};
+		pol["removeappid"]			= {};
+		pol["appaddacl"]			= {};
+		pol["removeappacl"]			= {};
+		pol["getappidentifiers"]	= {};
+		pol["addappidentifier"]		= {};
+		pol["removeappidentifier"]	= {};
+		pol["addgroup"]				= {};
+		pol["addgroupmember"]		= {};
+		pol["removegroupmember"]	= {};
+		pol["removegroup"]			= {};
+		pol["updatepassword"]		= {};
+		pol["isadmin"]				= {
+			{ "root", true },
+			{ "tor", true }
 		};
 
-		dfl["removeuser"]	= false;
-		pol["removeuser"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
 
-		dfl["removeservice"]	= false;
-		pol["removeservice"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["addacl"]	= false;
-		pol["addacl"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["removeacl"]	= false;
-		pol["removeacl"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["addidentifier"]	= false;
-		pol["addidentifier"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["removeidentifier"]	= false;
-		pol["removeidentifier"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["getidentifiers"]	= false;
-		pol["getidentifiers"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["createappid"]	= false;
-		pol["createappid"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["removeappid"]	= false;
-		pol["removeappid"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["appaddacl"]	= false;
-		pol["appaddacl"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["removeappacl"]	= false;
-		pol["removeappacl"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["getappidentifiers"]	= false;
-		pol["getappidentifiers"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["addappidentifier"]	= false;
-		pol["addappidentifier"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["removeappidentifier"]	= false;
-		pol["removeappidentifier"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["addgroup"]	= false;
-		pol["addgroup"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["addgroupmember"]	= false;
-		pol["addgroupmember"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["removegroupmember"]	= false;
-		pol["removegroupmember"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
-
-		dfl["removegroup"]	= false;
-		pol["removegroup"]	= {
-			{"root",true},
-			{"tor", true} // For debug
-		};
 	}
 
 	bool Check(const string& actor, const string& policy )
@@ -220,7 +133,7 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 	this->actions["createuser"]=make_pair(AUTHENTICATED, &SecopServer::DoCreateUser );
 	this->actions["removeuser"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveUser );
 	this->actions["getusers"]=make_pair(AUTHENTICATED, &SecopServer::DoGetUsers );
-	this->actions["updatepassword"]=make_pair(AUTHENTICATED, &SecopServer::DoUpdatePassword );
+	this->actions["updateuserpassword"]=make_pair(AUTHENTICATED, &SecopServer::DoUpdatePassword );
 
 	this->actions["getattributes"] = make_pair(AUTHENTICATED, &SecopServer::DoGetAttributes );
 	this->actions["getattribute"] = make_pair(AUTHENTICATED, &SecopServer::DoGetAttribute );
@@ -409,6 +322,27 @@ bool SecopServer::CheckMember(const Json::Value &cmd)
 	return !cmd.isNull() &&	cmd.isMember("member") && cmd["member"].isString();
 }
 
+bool SecopServer::CheckPassword(const Json::Value &cmd)
+{
+	return !cmd.isNull() &&	cmd.isMember("password") && cmd["password"].isString();
+}
+
+
+bool SecopServer::IsAdmin(const string &user)
+{
+	// Policy trumps membership
+	if( pc.Check(user, "isadmin") )
+	{
+		return true;
+	}
+	return this->store->GroupHasMember("admin", user);
+}
+
+bool SecopServer::AdminOrAllowed(const string &user, const string &policy)
+{
+	return this->IsAdmin(user) || pc.Check(user,policy);
+}
+
 bool
 SecopServer::CheckArguments(UnixStreamClientSocketPtr &client, int what, const Json::Value& cmd)
 {
@@ -426,6 +360,12 @@ SecopServer::CheckArguments(UnixStreamClientSocketPtr &client, int what, const J
 	}
 
 	if( (what & CHK_USR) && !SecopServer::CheckUsername(cmd) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Missing argument");
+		return false;
+	}
+
+	if( (what & CHK_PWD) && !SecopServer::CheckPassword(cmd) )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return false;
@@ -730,7 +670,7 @@ SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 		return;
 	}
 
-	if( ! pc.Check(session["user"]["username"].asString(), "createuser") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "createuser") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
@@ -760,6 +700,7 @@ SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 	this->store->CreateUser(user, displayname);
 	this->store->AddService(user, OPIUSER);
 	this->store->AddAcl(user, OPIUSER, "root");
+	this->store->AddAcl(user, OPIUSER, user);
 
 	Json::Value id(Json::objectValue);
 	id["password"]=pwd.c_str();
@@ -779,7 +720,7 @@ SecopServer::DoRemoveUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 		return;
 	}
 
-	if( ! pc.Check(session["user"]["username"].asString(), "removeuser") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removeuser") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
@@ -803,6 +744,45 @@ void SecopServer::DoUpdatePassword(UnixStreamClientSocketPtr &client, Json::Valu
 {
 	ScopedLog l("Update password");
 
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR | CHK_PWD, cmd) )
+	{
+		return;
+	}
+
+	string user = cmd["username"].asString();
+	string pwd  = cmd["password"].asString();
+	string actor = session["user"]["username"].asString();
+
+	// Self or admin
+	if( ( actor != user) && ! this->IsAdmin(actor) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
+		return;
+	}
+
+	// Check database
+	if( !this->store->HasUser( user ) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "User unknown");
+		return;
+	}
+
+	if( !this->store->HasService(user, OPIUSER) )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Database error");
+		return;
+	}
+
+	Json::Value newids(Json::arrayValue);
+
+	Json::Value newpd;
+	newpd["password"] = pwd;
+
+	newids.append(newpd);
+
+	this->store->UpdateIdentifiers(user, OPIUSER, newids);
+
+	this->SendOK(client, cmd);
 }
 
 void
@@ -819,6 +799,7 @@ SecopServer::DoGetUsers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Jso
 	vector<string> users = this->store->GetUsers();
 
 	Json::Value ret(Json::objectValue);
+	ret["users"]=Json::arrayValue;
 
 	for( auto user: users )
 	{
@@ -1054,7 +1035,7 @@ SecopServer::DoRemoveService(UnixStreamClientSocketPtr &client, Json::Value &cmd
 	}
 
 	/* Check if user is allowed to bypass acl-check */
-	if( ! pc.Check(session["user"]["username"].asString(), "removeservice" ) )
+	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removeservice" ) )
 	{
 		/* Only allowed to remove if no ACL or mentioned in ACL */
 		if ( ! this->store->ACLEmpty(user, service) && ! this->store->HasACL(user, service, session["user"]["username"].asString() ) )
@@ -1156,7 +1137,7 @@ SecopServer::DoAddACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 	{
 		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
 		{
-			if ( ! pc.Check(session["user"]["username"].asString() , "addacl") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "addacl") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1215,7 +1196,7 @@ SecopServer::DoRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Js
 
 	if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
 	{
-		if ( ! pc.Check(session["user"]["username"].asString() , "removeacl") )
+		if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "removeacl") )
 		{
 			this->SendErrorMessage(client, cmd, 4, "Not allowed");
 			return;
@@ -1306,7 +1287,7 @@ SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd
 	{
 		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
 		{
-			if ( ! pc.Check(session["user"]["username"].asString() , "addidentifier") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "addidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1360,7 +1341,7 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 	{
 		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
 		{
-			if ( ! pc.Check(session["user"]["username"].asString() , "removeidentifier") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "removeidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1439,7 +1420,7 @@ void SecopServer::DoGroupAdd(UnixStreamClientSocketPtr &client, Json::Value &cmd
 		return;
 	}
 
-	if( ! pc.Check(session["user"]["username"].asString(), "addgroup") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "addgroup") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
@@ -1484,7 +1465,7 @@ void SecopServer::DoGroupAddMember(UnixStreamClientSocketPtr &client, Json::Valu
 		return;
 	}
 
-	if( ! pc.Check(session["user"]["username"].asString(), "addgroupmember") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "addgroupmember") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
@@ -1507,7 +1488,7 @@ void SecopServer::DoGroupRemoveMember(UnixStreamClientSocketPtr &client, Json::V
 		return;
 	}
 
-	if( ! pc.Check(session["user"]["username"].asString(), "removegroupmember") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removegroupmember") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
@@ -1556,7 +1537,7 @@ void SecopServer::DoGroupRemove(UnixStreamClientSocketPtr &client, Json::Value &
 		return;
 	}
 
-	if( ! pc.Check(session["user"]["username"].asString(), "removegroup") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removegroup") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
@@ -1577,7 +1558,7 @@ void SecopServer::DoCreateAppID(UnixStreamClientSocketPtr &client, Json::Value &
 		return;
 	}
 
-	if( ! pc.Check(session["user"]["username"].asString(), "createappid") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "createappid") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
@@ -1627,7 +1608,7 @@ void SecopServer::DoRemoveAppID(UnixStreamClientSocketPtr &client, Json::Value &
 		return;
 	}
 
-	if( ! pc.Check(session["user"]["username"].asString(), "removeappid") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removeappid") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
@@ -1669,7 +1650,7 @@ void SecopServer::DoAppGetIdentifiers(UnixStreamClientSocketPtr &client, Json::V
 	// Not empty and user not in ACL
 	if( ! this->store->AppACLEmpty(appid) &&
 			! this->store->AppHasACL( appid, session["user"]["username"].asString() ) &&
-			! pc.Check(session["user"]["username"].asString(), "getappidentifiers") )
+			! this->AdminOrAllowed(session["user"]["username"].asString(), "getappidentifiers") )
 	{
 		this->SendErrorMessage(client, cmd, 4, "Access not allowed");
 		return;
@@ -1714,7 +1695,7 @@ void SecopServer::DoAppAddIdentifier(UnixStreamClientSocketPtr &client, Json::Va
 	{
 		if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
 		{
-			if ( ! pc.Check(session["user"]["username"].asString() , "addappidentifier") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "addappidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1760,7 +1741,7 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 	{
 		if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
 		{
-			if ( ! pc.Check(session["user"]["username"].asString() , "removeappidentifier") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "removeappidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1861,7 +1842,7 @@ void SecopServer::DoAppAddACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 	{
 		if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
 		{
-			if ( ! pc.Check(session["user"]["username"].asString() , "appaddacl") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "appaddacl") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1944,7 +1925,7 @@ void SecopServer::DoAppRemoveACL(UnixStreamClientSocketPtr &client, Json::Value 
 
 	if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
 	{
-		if ( ! pc.Check(session["user"]["username"].asString() , "removeappacl") )
+		if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "removeappacl") )
 		{
 			this->SendErrorMessage(client, cmd, 4, "Not allowed");
 			return;
@@ -2018,7 +1999,7 @@ SecopServer::DoGetIdentifiers(UnixStreamClientSocketPtr &client, Json::Value &cm
 	// Not empty and user not in ACL
 	if( ! this->store->ACLEmpty(user, service) &&
 			! this->store->HasACL(user, service, session["user"]["username"].asString() ) &&
-			! pc.Check(session["user"]["username"].asString(), "getidentifiers") )
+			! this->AdminOrAllowed(session["user"]["username"].asString(), "getidentifiers") )
 	{
 		this->SendErrorMessage(client, cmd, 4, "Access not allowed");
 		return;

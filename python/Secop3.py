@@ -73,6 +73,13 @@ class Secop(Client):
 			req["displayname"] = display
 		return self._dorequest(req,dump)
 
+	def updatepassword(self, user, password, dump=defaultdump):
+		req = {}
+		req["cmd"]="updateuserpassword"
+		req["username"]=user
+		req["password"]=password
+		return self._dorequest(req,dump)
+
 	def removeuser(self, user, dump=defaultdump):
 		req = {}
 		req["cmd"]="removeuser"

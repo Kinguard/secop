@@ -36,6 +36,7 @@ public:
 	void GroupRemoveMember( const string& group, const string& member);
 	vector<string> GroupGetMembers( const string& group);
 	void GroupRemove( const string& group);
+	bool GroupHasMember( const string& group, const string& member);
 
 	void AppAddIdentifier(const string& appid, const Json::Value& val);
 	Json::Value AppGetIdentifiers(const string& appid);
