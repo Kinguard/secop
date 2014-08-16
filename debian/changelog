@@ -1,3 +1,11 @@
+secop (0.9.5) vili; urgency=low
+
+  * Added get users group call
+  * Made group admin undeleteable
+  * Fix bug when removing user that left user in groups
+
+ -- Tor Krill <tor@openproducts.se>  Sat, 16 Aug 2014 10:32:53 +0200
+
 secop (0.9.4) testing; urgency=low
 
   * Fix unittests to work with admin group being added on creat 
