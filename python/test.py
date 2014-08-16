@@ -117,6 +117,43 @@ class TestSecop(TestBase):
 		self.assertTrue( status )
 		self.assertEqual( len(res["users"]),1)
 
+		(status, res) =self.s.addgroup("g1")
+		self.assertTrue( status )
+		(status, res) =self.s.addgroup("g2")
+		self.assertTrue( status )
+		(status, res) =self.s.addgroup("g3")
+		self.assertTrue( status )
+
+		(status, res) =self.s.getusergroups("user")
+		self.assertTrue( status )
+		self.assertEqual( len(res["groups"]),0)
+
+		(status, res) =self.s.addgroupmember("g1", "user" )
+		self.assertTrue( status )
+
+		(status, res) =self.s.getusergroups("user")
+		self.assertTrue( status )
+		self.assertEqual( len(res["groups"]),1)
+
+		(status, res) =self.s.addgroupmember("g3", "user" )
+		self.assertTrue( status )
+
+		(status, res) =self.s.getusergroups("user")
+		self.assertTrue( status )
+		self.assertEqual( len(res["groups"]),2)
+
+		(status, res) =self.s.addgroupmember("g2", "user" )
+		self.assertTrue( status )
+
+		(status, res) =self.s.getusergroups("user")
+		self.assertTrue( status )
+		self.assertEqual( len(res["groups"]),3)
+
+		(status, res) =self.s.removegroupmember("g1", "user" )
+		self.assertTrue( status )
+		(status, res) =self.s.getusergroups("user")
+		self.assertEqual( len(res["groups"]),2)
+
 	def test_04_groups(self):
 		# Initialise db
 		(status, res) = self.s.init("Secret password")
@@ -129,19 +166,19 @@ class TestSecop(TestBase):
 
 		(status, res) = self.s.getgroups()
 		self.assertTrue( status )
-		self.assertEqual(0, len(res["groups"]) )
+		self.assertEqual(0+1, len(res["groups"]) )
 
 		(status, res) = self.s.addgroup("test")
 		self.assertTrue( status )
 		(status, res) = self.s.getgroups()
 		self.assertTrue( status )
-		self.assertEqual(1, len(res["groups"]) )
+		self.assertEqual(1+1, len(res["groups"]) )
 
 		(status, res) = self.s.addgroup("test2")
 		self.assertTrue( status )
 		(status, res) = self.s.getgroups()
 		self.assertTrue( status )
-		self.assertEqual(2, len(res["groups"]) )
+		self.assertEqual(2+1, len(res["groups"]) )
 
 		(status, res) = self.s.removegroup("Notest")
 		self.assertFalse( status )
@@ -150,7 +187,7 @@ class TestSecop(TestBase):
 		self.assertTrue( status )
 		(status, res) = self.s.getgroups()
 		self.assertTrue( status )
-		self.assertEqual(1, len(res["groups"]) )
+		self.assertEqual(1+1, len(res["groups"]) )
 
 		(status, res) = self.s.addgroupmember("NoGroup","mem1")
 		self.assertFalse( status )
@@ -174,7 +211,13 @@ class TestSecop(TestBase):
 		self.assertTrue( status )
 		(status, res) = self.s.getgroups()
 		self.assertTrue( status )
-		self.assertEqual(0, len(res["groups"]) )
+		self.assertEqual(0+1, len(res["groups"]) )
+
+		(status, res) = self.s.removegroup("admin")
+		self.assertFalse( status )
+		(status, res) = self.s.getgroups()
+		self.assertTrue( status )
+		self.assertEqual(0+1, len(res["groups"]) )
 
 
 

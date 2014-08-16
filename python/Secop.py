@@ -88,6 +88,12 @@ class Secop(Client):
 		req["cmd"]="getusers"
 		return self._dorequest(req,dump)
 
+	def getusergroups(self, user, dump=defaultdump):
+		req = {}
+		req["cmd"]="getusergroups"
+		req["username"]=user
+		return self._dorequest(req,dump)
+
 	def getattributes(self, user, dump=defaultdump):
 		req = {}
 		req["cmd"]="getattributes"

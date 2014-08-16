@@ -70,6 +70,7 @@ protected:
 	void DoRemoveUser(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoUpdatePassword(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoGetUsers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGetUserGroups(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 
 	void DoAddAttribute(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
 	void DoRemoveAttribute(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);

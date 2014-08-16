@@ -134,6 +134,7 @@ SecopServer::SecopServer (const string& socketpath, const string& dbpath):
 	this->actions["removeuser"]=make_pair(AUTHENTICATED, &SecopServer::DoRemoveUser );
 	this->actions["getusers"]=make_pair(AUTHENTICATED, &SecopServer::DoGetUsers );
 	this->actions["updateuserpassword"]=make_pair(AUTHENTICATED, &SecopServer::DoUpdatePassword );
+	this->actions["getusergroups"]=make_pair(AUTHENTICATED, &SecopServer::DoGetUserGroups );
 
 	this->actions["getattributes"] = make_pair(AUTHENTICATED, &SecopServer::DoGetAttributes );
 	this->actions["getattribute"] = make_pair(AUTHENTICATED, &SecopServer::DoGetAttribute );
@@ -805,6 +806,35 @@ SecopServer::DoGetUsers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Jso
 	{
 		ret["users"].append(user);
 	}
+	this->SendOK(client, cmd, ret);
+}
+
+void SecopServer::DoGetUserGroups(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+{
+	ScopedLog l("Get user groups");
+
+	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
+	{
+		return;
+	}
+
+	string user = cmd["username"].asString();
+
+	Json::Value ret(Json::objectValue);
+	ret["groups"]=Json::arrayValue;
+
+	vector<string> groups = this->store->GroupsGet();
+	for(const string& group: groups)
+	{
+		vector<string> users = this->store->GroupGetMembers(group);
+
+		if( find( users.begin(), users.end(), user) != users.end() )
+		{
+			ret["groups"].append( group );
+		}
+
+	}
+
 	this->SendOK(client, cmd, ret);
 }
 
@@ -1544,6 +1574,14 @@ void SecopServer::DoGroupRemove(UnixStreamClientSocketPtr &client, Json::Value &
 	}
 
 	string group = cmd["group"].asString();
+
+	// Sanity check, we don't allow users to remove admin group
+	if( group == "admin" )
+	{
+		this->SendErrorMessage(client, cmd, 2, "Not allowed");
+		return;
+	}
+
 	this->store->GroupRemove(group);
 
 	this->SendOK(client, cmd);
