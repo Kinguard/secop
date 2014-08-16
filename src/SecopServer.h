@@ -129,6 +129,7 @@ private:
 	void SendErrorMessage(UnixStreamClientSocketPtr& client, const Json::Value& cmd, int errcode, const string& msg);
 	void SendOK(UnixStreamClientSocketPtr& client, const Json::Value& cmd, const Json::Value& val = Json::nullValue);
 
+	vector<string> GetUserGroups(const string& user);
 
 	Utils::Mutex biglock;
 	void HandleClient(UnixStreamClientSocketPtr client);

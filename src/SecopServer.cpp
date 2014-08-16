@@ -439,6 +439,25 @@ SecopServer::SendOK (UnixStreamClientSocketPtr& client, const Json::Value& cmd, 
 	this->SendReply(client, ret);
 }
 
+vector<string> SecopServer::GetUserGroups(const string &user)
+{
+	vector<string> ret;
+
+	vector<string> groups = this->store->GroupsGet();
+
+	for(const string& group: groups)
+	{
+		vector<string> users = this->store->GroupGetMembers(group);
+
+		if( find( users.begin(), users.end(), user) != users.end() )
+		{
+			ret.push_back( group );
+		}
+
+	}
+	return ret;
+}
+
 void SecopServer::HandleClient(UnixStreamClientSocketPtr client)
 {
 	char buf[64*1024];
@@ -735,6 +754,14 @@ SecopServer::DoRemoveUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 		return;
 	}
 
+	// Remove from groups
+	vector<string> groups = this->GetUserGroups( user );
+	for(const string& group: groups)
+	{
+		this->store->GroupRemoveMember( group, user);
+	}
+
+	// Remove user from database
 	this->store->DeleteUser(user);
 
 	this->SendOK(client, cmd);
@@ -823,16 +850,10 @@ void SecopServer::DoGetUserGroups(UnixStreamClientSocketPtr &client, Json::Value
 	Json::Value ret(Json::objectValue);
 	ret["groups"]=Json::arrayValue;
 
-	vector<string> groups = this->store->GroupsGet();
+	vector<string> groups = this->GetUserGroups(user);
 	for(const string& group: groups)
 	{
-		vector<string> users = this->store->GroupGetMembers(group);
-
-		if( find( users.begin(), users.end(), user) != users.end() )
-		{
 			ret["groups"].append( group );
-		}
-
 	}
 
 	this->SendOK(client, cmd, ret);
