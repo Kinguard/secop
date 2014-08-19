@@ -283,3 +283,23 @@ void TestCryptoStorage::TestAppACL()
 
 
 }
+
+void TestCryptoStorage::TestI18N()
+{
+	CryptoStorage c("/tmp/cstest.db","My Password");
+
+	CPPUNIT_ASSERT_EQUAL( (size_t)1, c.GroupsGet().size() );
+
+	CPPUNIT_ASSERT_NO_THROW( c.GroupAdd("gröpp") );
+	vector<string> groups = c.GroupsGet();
+
+	bool found = false;
+	for( const string& group:groups)
+	{
+		if( group == "gröpp" )
+		{
+			found = true;
+		}
+	}
+	CPPUNIT_ASSERT( found );
+}

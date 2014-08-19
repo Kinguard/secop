@@ -472,7 +472,7 @@ void SecopServer::HandleClient(UnixStreamClientSocketPtr client)
 		{
 			logg << "Read request of socket"<<lend;
 			Json::Value req;
-			if( this->reader.parse(buf, req) )
+			if( this->reader.parse(buf, buf+rd, req) )
 			{
 				if( req.isMember("cmd") && req["cmd"].isString() )
 				{
