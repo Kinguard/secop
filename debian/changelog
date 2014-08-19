@@ -1,3 +1,9 @@
+secop (0.9.6) vili; urgency=low
+
+  * Minor fix in json parsing
+
+ -- Tor Krill <tor@openproducts.se>  Tue, 19 Aug 2014 09:13:48 +0200
+
 secop (0.9.5) vili; urgency=low
 
   * Added get users group call
