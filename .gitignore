@@ -5,3 +5,5 @@ debian/files
 debian/secop.substvars
 debian/secop.debhelper*
 obj-x86_64*
+python/setup.py
+python/.pydevproject
