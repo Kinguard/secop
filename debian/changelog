@@ -1,3 +1,10 @@
+secop (0.9.7) vili; urgency=medium
+
+  * Change check modules to check for Debian version of jsoncpp
+  * Remove some dead code
+
+ -- Tor Krill <tor@openproducts.se>  Fri, 14 Jul 2017 15:54:27 +0200
+
 secop (0.9.6) vili; urgency=low
 
   * Minor fix in json parsing

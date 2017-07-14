@@ -5,7 +5,7 @@ include( FindPkgConfig )
 
 pkg_check_modules ( LIBCRYPTO++ REQUIRED libcrypto++>=5.6.1 )
 pkg_check_modules ( LIBUTILS REQUIRED libutils>=1.0 )
-pkg_check_modules ( LIBJSONCPP REQUIRED libjsoncpp>=1.0 )
+pkg_check_modules ( LIBJSONCPP REQUIRED jsoncpp>=1.0 )
 
 set (SECOP_VERSION_MAJOR 1)
 set (SECOP_VERSION_MINOR 0)

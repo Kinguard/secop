@@ -181,59 +181,12 @@ SecopServer::Dispatch ( SocketPtr con )
 {
 	ScopedLog l("Dispatch");
 
-#if 1
-
 	struct threadinfo* tin = new threadinfo( {this, con });
 	pthread_t thread;
 
 	pthread_create( &thread, nullptr, SecopServer::ClientThread, tin);
 
 	pthread_detach( thread );
-
-#else
-	// Convert into unixsocket
-	UnixStreamClientSocketPtr sock = static_pointer_cast<UnixStreamClientSocket>(con);
-
-	char buf[64*1024];
-	size_t rd;
-
-	Json::Value session;
-	session["user"]["authenticated"]=false;
-
-	try
-	{
-		while( (rd = sock->Read(buf, sizeof(buf))) > 0 )
-		{
-			logg << "Read request of socket"<<lend;
-			Json::Value req;
-			if( reader.parse(buf, req) )
-			{
-				if( req.isMember("cmd") && req["cmd"].isString() )
-				{
-					this->ProcessOneCommand(sock, req, session);
-				}
-				else
-				{
-					this->SendErrorMessage(sock, Json::Value::null, 4, "Missing command in request");
-					break;
-				}
-			}
-			else
-			{
-				this->SendErrorMessage(sock, Json::Value::null, 4, "Unable to parse request");
-				break;
-			}
-		}
-	}
-	catch(Utils::ErrnoException& e)
-	{
-		logg << Logger::Debug << "Caught exception on socket read ("<<e.what()<<")"<<lend;
-	}
-
-	// Make sure user is "logged out"
-
-	this->decreq();
-#endif
 }
 
 void
