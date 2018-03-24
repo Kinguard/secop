@@ -71,7 +71,6 @@ public:
 		pol["updatepassword"]		= {};
 		pol["isadmin"]				= {
 			{ "root", true },
-			{ "tor", true }
 		};
 
 

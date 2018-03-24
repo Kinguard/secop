@@ -1,3 +1,13 @@
+secop (0.9.8) vili; urgency=medium
+
+  * Update license to AGPLv3
+  * Use systemd instead of sysv init
+  * Use syslog when logging
+  * Add debug log option
+  * Remove debug policy left in by mistake
+
+ -- Tor Krill <tor@openproducts.se>  Sat, 24 Mar 2018 15:42:51 +0100
+
 secop (0.9.7) vili; urgency=medium
 
   * Change check modules to check for Debian version of jsoncpp

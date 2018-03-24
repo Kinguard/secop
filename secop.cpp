@@ -12,6 +12,7 @@
 #include <json/json.h>
 
 #include <unistd.h>
+#include <syslog.h>
 
 #include "SecopServer.h"
 #include "Crypto.h"
@@ -36,6 +37,11 @@ public:
 
 	virtual void Startup()
 	{
+		// Divert logger to syslog
+		openlog( "secop", LOG_PERROR, LOG_DAEMON);
+		logg.SetOutputter( [](const string& msg){ syslog(LOG_INFO, "%s",msg.c_str());});
+		logg.SetLogName("");
+
 		logg << Logger::Debug << "Starting up"<<lend;
 
 		Utils::SigHandler::Instance().AddHandler(SIGTERM, std::bind(&SecopApp::SigTerm, this, _1) );
@@ -44,10 +50,17 @@ public:
 
 		unlink(SOCKPATH);
 
+		this->options.AddOption( Option('D', "debug", Option::ArgNone,"0","Debug logging") );
 	}
 
 	virtual void Main()
 	{
+		if( this->options["debug"] == "1" )
+		{
+			logg << Logger::Info << "Increase logging to debug level "<<lend;
+			logg.SetLevel(Logger::Debug);
+		}
+
 		this->secop = SecopServerPtr( new SecopServer( SOCKPATH, DBPATH) );
 
 		chmod( SOCKPATH, 0666);
@@ -58,7 +71,7 @@ public:
 	virtual void ShutDown()
 	{
 		unlink(SOCKPATH);
-		logg << Logger::Debug << "Shutting down"<<lend;
+		logg << Logger::Info << "Shutting down"<<lend;
 	}
 
 	void SigTerm(int signo)
@@ -69,7 +82,7 @@ public:
 
 	void SigHup(int signo)
 	{
-
+		logg << Logger::Debug << "Got sighup" << lend;
 	}
 
 	virtual ~SecopApp()
@@ -82,7 +95,7 @@ private:
 
 int main(int argc, char** argv)
 {
-	logg.SetLevel(Logger::Debug);
+	logg.SetLevel(Logger::Info);
 
 	int ret;
 	try

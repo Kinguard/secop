@@ -3,9 +3,8 @@ Upstream-Name: secop
 Source: <url://example.com>
 
 Files: *
-Copyright: <years> <put author's name and email here>
-           <years> <likewise for another author>
-License: GPL-3.0+
+Copyright: 2014-2018  Tor Krill <tor@openproducts.se>
+License: AGPLv3
 
 Files: debian/*
 Copyright: 2014 Tor Krill <tor@openproducts.se>
