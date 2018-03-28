@@ -1,6 +1,7 @@
 [Unit]
 Description=KGP secure storage
 Requires=secop.service
+OnFailure=reboot.target
 
 [Service]
 Type=forking
