@@ -1,3 +1,10 @@
+secop (0.9.9) vili; urgency=medium
+
+  * Notify system that reboot is required
+  * Reboot system upon secop failure
+
+ -- Tor Krill <tor@openproducts.se>  Wed, 28 Mar 2018 18:38:17 +0200
+
 secop (0.9.8) vili; urgency=medium
 
   * Update license to AGPLv3
