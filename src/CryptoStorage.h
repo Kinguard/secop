@@ -101,8 +101,7 @@ private:
 	Crypto idcrypto;
 	AutoSeededRandomPool rnd;
 
-	Json::FastWriter writer;
-	Json::Reader reader;
+    unique_ptr<Json::StreamWriter> writer;
 	Json::Value data;
 };
 

@@ -6,6 +6,10 @@ Files: *
 Copyright: 2014-2018  Tor Krill <tor@openproducts.se>
 License: AGPLv3
 
+Files: jsoncpp/*
+Copyright: 2007-2010 Baptiste Lepilleur and The JsonCpp Authors
+License: Public domain/MIT
+
 Files: debian/*
 Copyright: 2014 Tor Krill <tor@openproducts.se>
 License: GPL-3.0+

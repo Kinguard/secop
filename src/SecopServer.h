@@ -138,9 +138,10 @@ private:
 	unsigned char state;
 	CryptoStoragePtr store;
 	string dbpath;
-	Json::FastWriter writer;
-	Json::Reader reader;
-	typedef void (SecopServer::*Action)(UnixStreamClientSocketPtr&, Json::Value&, Json::Value&);
+
+    unique_ptr<Json::StreamWriter> writer;
+
+    typedef void (SecopServer::*Action)(UnixStreamClientSocketPtr&, Json::Value&, Json::Value&);
 	map<string,pair<unsigned char, Action>> actions;
 };
 

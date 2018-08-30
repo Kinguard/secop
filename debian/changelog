@@ -1,3 +1,10 @@
+secop (0.10) vili; urgency=medium
+
+  * Updated with included jsoncpp instead of using external
+    version.
+
+ -- Tor Krill <tor@openproducts.se>  Thu, 30 Aug 2018 08:51:51 +0200
+
 secop (0.9.9) vili; urgency=medium
 
   * Notify system that reboot is required

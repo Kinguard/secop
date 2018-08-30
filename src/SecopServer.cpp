@@ -32,7 +32,7 @@ public:
 		logg << Logger::Debug << name << " start"<<lend;
 	}
 
-	virtual ~ScopedLog()
+    virtual ~ScopedLog()
 	{
 		logg << Logger::Debug << name << " stop"<<lend;
 	}
@@ -118,11 +118,17 @@ struct threadinfo
 };
 
 SecopServer::SecopServer (const string& socketpath, const string& dbpath):
-		state(UNINITIALIZED),
 		Utils::Net::NetServer(UnixStreamServerSocketPtr( new UnixStreamServerSocket(socketpath)), 0),
-		dbpath(dbpath)
+        state(UNINITIALIZED),
+        dbpath(dbpath)
 {
 	logg << Logger::Debug << "Secop server starting"<<lend;
+
+    // Initialize StreamWriter
+    Json::StreamWriterBuilder builder;
+    builder["commentStyle"] = "None";
+    this->writer = unique_ptr<Json::StreamWriter>(builder.newStreamWriter());
+
 
 	// Setup commands possible
 	this->actions["init"]=make_pair(UNINITIALIZED, &SecopServer::DoInitialize);
@@ -230,8 +236,10 @@ SecopServer::ProcessOneCommand ( UnixStreamClientSocketPtr& client,
 void
 SecopServer::SendReply ( UnixStreamClientSocketPtr& client, Json::Value& val )
 {
-	string r = writer.write(val);
-	client->Write(r.c_str(), r.length());
+    stringstream r;
+    writer->write(val, &r);
+
+    client->Write(r.str().c_str(), r.str().length());
 }
 
 inline bool
@@ -414,32 +422,45 @@ void SecopServer::HandleClient(UnixStreamClientSocketPtr client)
 {
 	char buf[64*1024];
 	size_t rd;
+	int errcount = 0;
 
 	Json::Value session;
 	session["user"]["authenticated"]=false;
 
+	logg << Logger::Debug << "Handle new client connection" << lend;
+
 	try
 	{
-		while( (rd = client->Read(buf, sizeof(buf))) > 0 )
+        Json::CharReaderBuilder builder;
+        builder["collectComments"] = false;
+
+		while( (rd = client->Read(buf, sizeof(buf))) > 0 && errcount < 5 )
 		{
-			logg << "Read request of socket"<<lend;
+			logg << "Read request of socket "<< static_cast<int>(rd) << " bytes." << lend;
 			Json::Value req;
-			if( this->reader.parse(buf, buf+rd, req) )
+            string errs;
+            stringstream stream(string(buf, buf+rd));
+            if( Json::parseFromStream(builder, stream, &req, &errs ) )
+            //if( this->reader.parse(buf, buf+rd, req) )
 			{
 				if( req.isMember("cmd") && req["cmd"].isString() )
 				{
 					this->ProcessOneCommand(client, req, session);
+					// CMD "sucessful", reset counter
+					errcount = 0;
 				}
 				else
 				{
+					logg << Logger::Debug << "Missing command in request: ["<< req.toStyledString()<<"]"<<lend;
 					this->SendErrorMessage(client, Json::Value::null, 4, "Missing command in request");
-					break;
+					errcount++;
 				}
 			}
 			else
 			{
+				logg << Logger::Notice << "Unable to parse request from client" << lend;
 				this->SendErrorMessage(client, Json::Value::null, 4, "Unable to parse request");
-				break;
+				errcount++;
 			}
 		}
 	}
@@ -447,6 +468,13 @@ void SecopServer::HandleClient(UnixStreamClientSocketPtr client)
 	{
 		logg << Logger::Debug << "Caught exception on socket read ("<<e.what()<<")"<<lend;
 	}
+
+	if( errcount >= 5 )
+	{
+		logg << Logger::Debug << "Terminating connection due to to many errors" << lend;
+	}
+
+	logg << Logger::Debug << "Close client connection" << lend;
 
 	// Make sure user is "logged out"
 	this->decreq();
@@ -473,7 +501,7 @@ void
 SecopServer::DoInitialize ( UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session )
 {
 	ScopedLog l("Initialize");
-
+    (void) session;
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID, cmd) )
 	{
 		return;
@@ -532,7 +560,7 @@ SecopServer::DoStatus ( UnixStreamClientSocketPtr& client, Json::Value& cmd, Jso
 	}
 
 	Json::Value ret(Json::objectValue);
-	ret["server"]["state"]=(int)this->state;
+    ret["server"]["state"]=static_cast<int>(this->state);
 	ret["server"]["api"]=API_VERSION;
 
 	if(session["user"]["authenticated"].asBool() )
@@ -605,7 +633,7 @@ SecopServer::DoAuthenticate ( UnixStreamClientSocketPtr& client,
 			return;
 		}
 
-		Json::Value id = ids[(Json::Value::UInt)0];
+        Json::Value id = ids[static_cast<Json::Value::UInt>(0)];
 
 		if( !id.isMember("password"))
 		{
@@ -770,6 +798,7 @@ SecopServer::DoGetUsers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Jso
 {
 	//TODO: Who is allowed to do this?
 	ScopedLog l("Get users");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID, cmd) )
 	{
@@ -791,6 +820,7 @@ SecopServer::DoGetUsers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Jso
 void SecopServer::DoGetUserGroups(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
 {
 	ScopedLog l("Get user groups");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
 	{
@@ -815,6 +845,7 @@ void SecopServer::DoAddAttribute(UnixStreamClientSocketPtr &client, Json::Value 
 {
 	//TODO: Access control!
 	ScopedLog l("Add Attribute");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
 	{
@@ -853,6 +884,7 @@ void SecopServer::DoRemoveAttribute(UnixStreamClientSocketPtr &client, Json::Val
 {
 	//TODO: Access control!
 	ScopedLog l("Remove Attribute");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
 	{
@@ -890,6 +922,7 @@ void SecopServer::DoGetAttributes(UnixStreamClientSocketPtr &client, Json::Value
 {
 	//TODO: Access control!
 	ScopedLog l("get Attributes");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
 	{
@@ -919,6 +952,7 @@ void SecopServer::DoGetAttribute(UnixStreamClientSocketPtr &client, Json::Value 
 {
 	//TODO: Access control!
 	ScopedLog l("Get Attribute");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
 	{
@@ -960,6 +994,7 @@ SecopServer::DoGetServices(UnixStreamClientSocketPtr &client, Json::Value &cmd, 
 	//TODO: Howto handle opiuser service?
 
 	ScopedLog l("Get services");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR, cmd) )
 	{
@@ -985,6 +1020,7 @@ SecopServer::DoAddService(UnixStreamClientSocketPtr &client, Json::Value &cmd, J
 	//TODO: Howto handle opiuser service?
 
 	ScopedLog l("Add service");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR | CHK_SRV, cmd) )
 	{
@@ -1058,6 +1094,7 @@ void
 SecopServer::DoGetACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
 {
 	ScopedLog l("Get ACL");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR | CHK_SRV, cmd) )
 	{
@@ -1215,6 +1252,7 @@ void
 SecopServer::DoHasACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
 {
 	ScopedLog l("Has ACL");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_USR | CHK_SRV, cmd) )
 	{
@@ -1438,6 +1476,7 @@ void SecopServer::DoGroupAdd(UnixStreamClientSocketPtr &client, Json::Value &cmd
 void SecopServer::DoGroupsGet(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
 {
 	ScopedLog l("Get groups");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID, cmd) )
 	{
@@ -1509,6 +1548,7 @@ void SecopServer::DoGroupRemoveMember(UnixStreamClientSocketPtr &client, Json::V
 void SecopServer::DoGroupGetMembers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
 {
 	ScopedLog l("Get group members");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_GRP, cmd) )
 	{
@@ -1592,6 +1632,7 @@ void SecopServer::DoCreateAppID(UnixStreamClientSocketPtr &client, Json::Value &
 void SecopServer::DoGetAppIDs(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
 {
 	ScopedLog l("Get appids");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID, cmd) )
 	{
@@ -1870,6 +1911,7 @@ void SecopServer::DoAppAddACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 void SecopServer::DoAppGetACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
 {
 	ScopedLog l("Get app ACL");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
 	{
@@ -1952,6 +1994,7 @@ void SecopServer::DoAppRemoveACL(UnixStreamClientSocketPtr &client, Json::Value 
 void SecopServer::DoAppHasACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
 {
 	ScopedLog l("Has app ACL");
+    (void) session;
 
 	if( ! this->CheckArguments( client, CHK_API | CHK_TID | CHK_APPID, cmd) )
 	{

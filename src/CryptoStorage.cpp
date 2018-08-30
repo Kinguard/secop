@@ -41,6 +41,12 @@ void CryptoStorage::New()
 void
 CryptoStorage::Initialize ()
 {
+    // Initialize StreamWriter
+
+    Json::StreamWriterBuilder builder;
+
+    this->writer = unique_ptr<Json::StreamWriter>(builder.newStreamWriter());
+
 	if( ! File::FileExists( path ) )
 	{
 		logg << Logger::Debug << "Creating new storage at "<<this->path<<lend;
@@ -56,7 +62,7 @@ CryptoStorage::Initialize ()
 
 
 CryptoStorage::CryptoStorage ( const string& path, const SecString& pwd )
-	:path(path), version(1.0),readversion(0)
+    :version(1.0), readversion(0), path(path)
 {
 	SecVector<byte> key = Crypto::PBKDF2(pwd,32);
 	this->key = key;
@@ -66,7 +72,7 @@ CryptoStorage::CryptoStorage ( const string& path, const SecString& pwd )
 
 
 CryptoStorage::CryptoStorage (const string& path, const SecVector<byte>& key)
-	:path(path), key(key),filecrypto(key, iv),version(1.0),readversion(0)
+    :version(1.0),readversion(0), path(path), key(key), filecrypto(key, iv)
 {
 	this->Initialize();
 }
@@ -435,33 +441,33 @@ CryptoStorage::~CryptoStorage ()
 void
 CryptoStorage::Read ()
 {
-	Json::Reader reader;
-
 	vector<byte> in;
 	File::ReadVector<vector<byte>>(this->path, in);
 
-	string cnt = this->filecrypto.Decrypt(in);
+    stringstream cnt(this->filecrypto.Decrypt(in));
+    logg << Logger::Debug << "Decrypted db, size "<< static_cast<int>(cnt.str().size()) <<lend;
+    logg << Logger::Debug << "Content ["<<cnt.str() <<"]"<<lend;
 
-	logg << "Decrypted db, size "<< cnt.size()<<lend;
-	logg << "Content ["<<cnt<<"]"<<lend;
-	if( reader.parse(cnt, this->data ) )
-	{
-		logg << Logger::Debug << "Read storage at"<< this->path <<lend;
-		if( data["config"].isMember("version") && data["config"]["version"].isDouble() )
-		{
-			this->readversion = this->data["config"]["version"].asDouble();
-			logg << Logger::Debug << "Storage file has version "<< this->readversion << lend;
-		}
-		else
-		{
-			logg << Logger::Debug << "No version information found on storage"<<lend;
-		}
-	}
-	else
-	{
-		logg << Logger::Debug << "Failed to parse storage at "<<this->path<<lend;
-		throw std::runtime_error("Failed to parse storage db");
-	}
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    Json::Value ret(Json::arrayValue);
+    string errs;
+    if( ! Json::parseFromStream(builder, cnt, &this->data, &errs) )
+    {
+        logg << Logger::Error << "Failed to parse storage at "<<this->path << " Errors " << errs <<lend;
+        throw std::runtime_error(errs);
+    }
+
+    logg << Logger::Debug << "Read storage at"<< this->path <<lend;
+    if( data["config"].isMember("version") && data["config"]["version"].isDouble() )
+    {
+        this->readversion = this->data["config"]["version"].asDouble();
+        logg << Logger::Debug << "Storage file has version "<< static_cast<int>(this->readversion) << lend;
+    }
+    else
+    {
+        logg << Logger::Debug << "No version information found on storage"<<lend;
+    }
 
 }
 
@@ -742,8 +748,9 @@ CryptoStorage::UpdateIdentifiers ( const string& username,
 void
 CryptoStorage::Write ()
 {
-	string output = this->writer.write(this->data);
-	string enc = this->filecrypto.Encrypt(output);
+    stringstream output;
+    this->writer->write(this->data, &output);
+    string enc = this->filecrypto.Encrypt(output.str());
 
 #if 0
 	File::Write(path, enc, 0600);
@@ -879,10 +886,16 @@ CryptoStorage::DecryptIdentifiers(const string& username, const string& service)
 	Crypto::Base64Decode(this->data["user"][username]["services"][service]["identifiers"].asString(), val);
 
 	this->idcrypto.Initialize(this->key, iv);
-	string ids = this->idcrypto.Decrypt(val);
+    stringstream ids( this->idcrypto.Decrypt(val) );
 
-	Json::Value ret(Json::arrayValue);
-	this->reader.parse(ids, ret);
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    Json::Value ret(Json::arrayValue);
+    string errs;
+    if( ! Json::parseFromStream(builder, ids, &ret, &errs) )
+    {
+        throw std::runtime_error(errs);
+    }
 
 	return ret;
 }
@@ -898,9 +911,10 @@ CryptoStorage::EncryptIdentifiers(const string& username, const string& service,
 	this->data["user"][username]["services"][service]["iv"]=b64iv;
 
 	this->idcrypto.Initialize(this->key, iv);
-
+    stringstream output;
+    this->writer->write(val, &output);
 	string b64val = Crypto::Base64Encode(
-			this->idcrypto.Encrypt( this->writer.write(val) )
+            this->idcrypto.Encrypt( output.str() )
 			);
 
 	this->data["user"][username]["services"][service]["identifiers"] = b64val;
@@ -916,10 +930,16 @@ Json::Value CryptoStorage::AppDecryptIdentifiers(const string &appid)
 	Crypto::Base64Decode(this->data["system"][appid]["identifiers"].asString(), val);
 
 	this->idcrypto.Initialize(this->key, iv);
-	string ids = this->idcrypto.Decrypt(val);
+    stringstream ids(this->idcrypto.Decrypt(val));
 
-	Json::Value ret(Json::arrayValue);
-	this->reader.parse(ids, ret);
+    Json::CharReaderBuilder builder;
+    builder["collectComments"] = false;
+    Json::Value ret(Json::arrayValue);
+    string errs;
+    if( ! Json::parseFromStream(builder, ids, &ret, &errs) )
+    {
+        throw std::runtime_error(errs);
+    }
 
 	return ret;
 }
@@ -935,8 +955,10 @@ void CryptoStorage::AppEncryptIdentifiers(const string &appid, const Json::Value
 
 	this->idcrypto.Initialize(this->key, iv);
 
+    stringstream output;
+    this->writer->write( val, & output);
 	string b64val = Crypto::Base64Encode(
-			this->idcrypto.Encrypt( this->writer.write(val) )
+            this->idcrypto.Encrypt( output.str() )
 			);
 
 	this->data["system"][appid]["identifiers"] = b64val;

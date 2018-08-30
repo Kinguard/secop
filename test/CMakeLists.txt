@@ -8,11 +8,11 @@ set( testsecop_src
 
 include_directories(
     "${PROJECT_SOURCE_DIR}/src"
-    "${LIBJSONCPP_INCLUDE_DIRS}"
+    "${PROJECT_SOURCE_DIR}/jsoncpp"
 )
 
-add_definitions( -std=c++11 )
+add_definitions( -std=c++11 -Wall )
 add_executable( testsecop ${testsecop_src} )
 
-target_link_libraries( testsecop applib ${CPPUNIT_LDFLAGS} ${LIBCRYPTO++_LDFLAGS} ${LIBUTILS_LDFLAGS})
+target_link_libraries( testsecop applib jsoncpplib ${CPPUNIT_LDFLAGS} ${LIBCRYPTO++_LDFLAGS} ${LIBUTILS_LDFLAGS})
 

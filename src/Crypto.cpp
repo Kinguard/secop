@@ -72,7 +72,7 @@ string Crypto::Decrypt(const string& encoded)
 	this->d.SetKeyWithIV( &this->key[0], this->key.size(), &this->iv[0] );
 
 	string plain;
-	logg << Logger::Debug << "Decode string size "<<encoded.size()<<lend;
+    logg << Logger::Debug << "Decode string size "<<static_cast<int>(encoded.size())<<lend;
 	StringSource s(encoded, true,
 		new StreamTransformationFilter(this->d,
 			new StringSink(plain)
@@ -171,10 +171,10 @@ Crypto::PBKDF2 ( const SecString& passwd, size_t keylength, const vector<byte>& 
 
 	PKCS5_PBKDF2_HMAC<SHA512> df;
 
-	int iters_done = df.DeriveKey(
+    df.DeriveKey(
 		&ret[0], ret.size(),
 		0,
-		(const byte*)passwd.c_str(), passwd.length(),
+        (const byte*)passwd.c_str(), passwd.length(),
 		&salt[0],salt.size(),
 		iter);
 
