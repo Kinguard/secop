@@ -21,24 +21,6 @@ using namespace Utils::Net;
 
 #define OPIUSER "opiuser"
 
-// Convenience class for debug/trace
-class ScopedLog: public NoCopy
-{
-private:
-	string name;
-public:
-	ScopedLog(const string& name): name(name)
-	{
-		logg << Logger::Debug << name << " start"<<lend;
-	}
-
-    virtual ~ScopedLog()
-	{
-		logg << Logger::Debug << name << " stop"<<lend;
-	}
-
-};
-
 class PolicyController
 {
 	/* Key - Policy value - default reply if user not mentioned */

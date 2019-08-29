@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 8.0.0), cmake, dh-systemd (>= 1.5),
   libutils-dev, 
   libcrypto++-dev,
   libcppunit-dev
-Standards-Version: 3.9.4
+Standards-Version: 3.9.8
 Homepage: http://www.openproducts.se
 
 Package: secop
