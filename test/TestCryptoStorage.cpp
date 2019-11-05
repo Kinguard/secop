@@ -28,6 +28,9 @@ void TestCryptoStorage::TestBasic()
 {
 	// Wrong password, should fail
 	CPPUNIT_ASSERT_THROW( CryptoStorage("/tmp/cstest.db", "my bad password"), CryptoPP::InvalidCiphertext );
+	CPPUNIT_ASSERT_NO_THROW( CryptoStorage("/tmp/cstest.db", "My Password", true) );
+
+	CryptoStorage c("/tmp/cstest.db","My Password");
 }
 
 void TestCryptoStorage::TestUser()

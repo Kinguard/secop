@@ -21,8 +21,8 @@ using namespace std;
 class CryptoStorage
 {
 public:
-	CryptoStorage (const string& path, const SecString& pwd);
-	CryptoStorage (const string& path, const SecVector<byte>& key);
+	CryptoStorage (const string& path, const SecString& pwd, bool undertest=false);
+	CryptoStorage (const string& path, const SecVector<byte>& key, bool undertest=false);
 
 	bool HasAppID(const string& appid);
 	void CreateAppID(const string& appid);
@@ -95,6 +95,7 @@ private:
 	const double version;
 	double readversion;
 	std::string path;
+	bool undertest;
 
 	SecVector<byte> key;
 	Crypto filecrypto;

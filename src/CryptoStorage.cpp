@@ -61,8 +61,8 @@ CryptoStorage::Initialize ()
 
 
 
-CryptoStorage::CryptoStorage ( const string& path, const SecString& pwd )
-    :version(1.0), readversion(0), path(path)
+CryptoStorage::CryptoStorage (const string& path, const SecString& pwd , bool undertest)
+	:version(1.0), readversion(0), path(path), undertest(undertest)
 {
 	SecVector<byte> key = Crypto::PBKDF2(pwd,32);
 	this->key = key;
@@ -71,8 +71,8 @@ CryptoStorage::CryptoStorage ( const string& path, const SecString& pwd )
 }
 
 
-CryptoStorage::CryptoStorage (const string& path, const SecVector<byte>& key)
-    :version(1.0),readversion(0), path(path), key(key), filecrypto(key, iv)
+CryptoStorage::CryptoStorage (const string& path, const SecVector<byte>& key, bool undertest)
+	:version(1.0),readversion(0), path(path), undertest(undertest), key(key), filecrypto(key, iv)
 {
 	this->Initialize();
 }
@@ -435,7 +435,6 @@ void CryptoStorage::AppRemoveAcl(const string &appid, const string &entity)
 
 CryptoStorage::~CryptoStorage ()
 {
-	this->Write();
 }
 
 void
@@ -446,7 +445,10 @@ CryptoStorage::Read ()
 
     stringstream cnt(this->filecrypto.Decrypt(in));
     logg << Logger::Debug << "Decrypted db, size "<< static_cast<int>(cnt.str().size()) <<lend;
-    logg << Logger::Debug << "Content ["<<cnt.str() <<"]"<<lend;
+	if( this->undertest )
+	{
+		logg << Logger::Debug << "Content ["<<cnt.str() <<"]"<<lend;
+	}
 
     Json::CharReaderBuilder builder;
     builder["collectComments"] = false;
@@ -748,16 +750,19 @@ CryptoStorage::UpdateIdentifiers ( const string& username,
 void
 CryptoStorage::Write ()
 {
-    stringstream output;
-    this->writer->write(this->data, &output);
-    string enc = this->filecrypto.Encrypt(output.str());
+	// Make a local backup if db exists.
+	if( File::FileExists(this->path) )
+	{
+		File::Copy(this->path, this->path+".bak");
+	}
 
-#if 0
-	File::Write(path, enc, 0600);
-#else
+	stringstream output;
+	this->writer->write(this->data, &output);
+	string enc = this->filecrypto.Encrypt(output.str());
+
 	vector<byte> vout(enc.begin(), enc.end());
-	File::WriteVector<vector<byte>>(path, vout, 0600);
-#endif
+
+	File::SafeWrite(this->path, &vout[0], vout.size(), 0600);
 }
 
 void

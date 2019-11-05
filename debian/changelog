@@ -1,3 +1,18 @@
+secop (0.50) vili; urgency=medium
+
+  * Reduce writing of secop db to backend storage
+  * Rework storage write to be more cautious
+  * Disable debug dump of db in none test scenarios
+  * Configure logging when running unittests
+
+ -- Tor Krill <tor@openproducts.se>  Tue, 05 Nov 2019 14:55:45 +0100
+
+secop (0.12) vili; urgency=medium
+
+  * Buster adaptations
+
+ -- Tor Krill <tor@openproducts.se>  Thu, 29 Aug 2019 10:20:33 +0200
+
 secop (0.11) vili; urgency=medium
 
   * Remove ScopedLog implementation and use libutils one

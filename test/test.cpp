@@ -2,7 +2,15 @@
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
 
+#include <libutils/Logger.h>
+
 int main(int argc, char** argv){
+	(void) argc;
+	(void) argv;
+
+	// Setup logging
+	Utils::logg.SetLevel( Utils::Logger::Notice);
+
 	// Get the top level suite from the registry
 	CppUnit::Test *suite = CppUnit::TestFactoryRegistry::getRegistry().makeTest();
 

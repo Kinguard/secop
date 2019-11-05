@@ -4,7 +4,7 @@ Priority: extra
 Maintainer: Tor Krill <tor@openproducts.se>
 Build-Depends: debhelper (>= 8.0.0), cmake, dh-systemd (>= 1.5),
   pkg-config,
-  libutils-dev, 
+  libutils-dev (>= 1.5.18),
   libcrypto++-dev,
   libcppunit-dev
 Standards-Version: 3.9.8
