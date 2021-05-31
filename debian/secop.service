@@ -5,7 +5,7 @@ OnFailure=reboot.target
 
 [Service]
 Type=forking
-PIDFile=/var/run/secop.pid
+PIDFile=/run/secop.pid
 ExecStart=/usr/sbin/secop -d -u secop -g secop
 
 # No install target since secop is started by opi-control

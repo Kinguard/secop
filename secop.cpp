@@ -30,7 +30,7 @@ class SecopApp: public DaemonApplication
 {
 public:
 	/* Should perhaps change user/group to secop */
-	SecopApp():DaemonApplication("secop","/var/run", "root", "root")
+	SecopApp():DaemonApplication("secop","/run", "root", "root")
 	{
 
 	}

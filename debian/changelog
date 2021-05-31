@@ -1,3 +1,9 @@
+secop (0.51) vili; urgency=medium
+
+  * Move pidfile to /run
+
+ -- Tor Krill <tor@openproducts.se>  Mon, 31 May 2021 15:14:09 +0200
+
 secop (0.50) vili; urgency=medium
 
   * Reduce writing of secop db to backend storage
