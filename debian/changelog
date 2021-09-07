@@ -1,3 +1,9 @@
+secop (0.52) vili; urgency=medium
+
+  * Rebuild
+
+ -- Tor Krill <tor@openproducts.se>  Wed, 04 Aug 2021 10:52:12 +0200
+
 secop (0.51) vili; urgency=medium
 
   * Move pidfile to /run
