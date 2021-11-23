@@ -19,19 +19,13 @@ Crypto::Crypto(const SecVector<byte>& key, const vector<byte>& iv)
 	this->Initialize(key, iv);
 }
 
-Crypto::Crypto ()
-{
-}
+Crypto::Crypto () = default;
 
 void
 Crypto::Initialize ( const SecVector<byte>& key, const vector<byte>& iv )
 {
 	this->key = key;
 	this->iv = iv;
-#if 0
-	this->e.SetKeyWithIV( &key[0], key.size(), &iv[0] );
-	this->d.SetKeyWithIV( &key[0], key.size(), &iv[0] );
-#endif
 }
 
 string Crypto::Encrypt(const string& plain)
@@ -194,6 +188,4 @@ Crypto::SetDefaultSalt ( const vector<byte>& salt )
 }
 
 
-Crypto::~Crypto()
-{
-}
+Crypto::~Crypto() = default;

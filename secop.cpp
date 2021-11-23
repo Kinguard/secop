@@ -9,7 +9,7 @@
 #include <libutils/ArgParser.h>
 #include <libutils/Application.h>
 
-#include <json/json.h>
+#include <nlohmann/json.hpp>
 
 #include <unistd.h>
 #include <syslog.h>
@@ -25,6 +25,7 @@ using namespace Utils;
 using namespace Utils::Net;
 using namespace std::placeholders;
 
+using json = nlohmann::json;
 
 class SecopApp: public DaemonApplication
 {
@@ -35,7 +36,7 @@ public:
 
 	}
 
-	virtual void Startup()
+	void Startup() override
 	{
 		// Divert logger to syslog
 		openlog( "secop", LOG_PERROR, LOG_DAEMON);
@@ -53,7 +54,7 @@ public:
 		this->options.AddOption( Option('D', "debug", Option::ArgNone,"0","Debug logging") );
 	}
 
-	virtual void Main()
+	void Main() override
 	{
 		if( this->options["debug"] == "1" )
 		{
@@ -68,7 +69,7 @@ public:
 		this->secop->Run();
 	}
 
-	virtual void ShutDown()
+	void ShutDown() override
 	{
 		unlink(SOCKPATH);
 		logg << Logger::Info << "Shutting down"<<lend;
@@ -76,19 +77,17 @@ public:
 
 	void SigTerm(int signo)
 	{
+		(void) signo;
 		logg << Logger::Info << "Got sigterm initiate shutdown"<<lend;
 		this->secop->ShutDown();
 	}
 
 	void SigHup(int signo)
 	{
+		(void) signo;
 		logg << Logger::Debug << "Got sighup" << lend;
 	}
 
-	virtual ~SecopApp()
-	{
-
-	}
 private:
 	SecopServerPtr secop;
 };

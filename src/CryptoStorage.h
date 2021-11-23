@@ -12,17 +12,18 @@
 #include <vector>
 #include <memory>
 
-#include <json/json.h>
+#include <nlohmann/json.hpp>
 
 #include "Crypto.h"
 
 using namespace std;
+using json = nlohmann::json;
 
 class CryptoStorage
 {
 public:
-	CryptoStorage (const string& path, const SecString& pwd, bool undertest=false);
-	CryptoStorage (const string& path, const SecVector<byte>& key, bool undertest=false);
+	CryptoStorage (string  path, const SecString& pwd, bool undertest=false);
+	CryptoStorage (string  path, const SecVector<byte>& key, bool undertest=false);
 
 	bool HasAppID(const string& appid);
 	void CreateAppID(const string& appid);
@@ -38,9 +39,9 @@ public:
 	void GroupRemove( const string& group);
 	bool GroupHasMember( const string& group, const string& member);
 
-	void AppAddIdentifier(const string& appid, const Json::Value& val);
-	Json::Value AppGetIdentifiers(const string& appid);
-	void AppUpdateIdentifiers(const string& appid, const Json::Value& val);
+	void AppAddIdentifier(const string& appid, const json& val);
+	json AppGetIdentifiers(const string& appid);
+	void AppUpdateIdentifiers(const string& appid, const json& val);
 
 	void AppAddAcl(const string& appid, const string& entity);
 	bool AppHasACL(const string& appid, const string& entity);
@@ -56,7 +57,7 @@ public:
 	bool HasAttribute( const string& username, const string& attributename);
 	vector<string> GetAttributes(const string& username);
 	string GetAttribute( const string& username, const string& attributename);
-	void AddAttribute(const string& username, const string& attributename, const string attributevalue);
+	void AddAttribute(const string& username, const string& attributename, const string& attributevalue);
 	void RemoveAttribute(const string& username, const string& attributename);
 
 	bool HasService( const string& user, const string& service);
@@ -70,9 +71,9 @@ public:
 	bool HasACL(const string& username, const string& service, const string& entity);
 	vector<string> GetACL(const string& username, const string& service);
 
-	void AddIdentifier(const string& username, const string& service, const Json::Value& val);
-	Json::Value GetIdentifiers(const string& username, const string& service);
-	void UpdateIdentifiers(const string& username, const string& service, const Json::Value& val);
+	void AddIdentifier(const string& username, const string& service, const json& val);
+	json GetIdentifiers(const string& username, const string& service);
+	void UpdateIdentifiers(const string& username, const string& service, const json& val);
 
 	void CreateApplication(const string& appname);
 
@@ -83,11 +84,11 @@ private:
 	void Read();
 	void Write();
 
-	Json::Value DecryptIdentifiers(const string& username, const string& service);
-	void EncryptIdentifiers(const string& username, const string& service, const Json::Value& val);
+	json DecryptIdentifiers(const string& username, const string& service);
+	void EncryptIdentifiers(const string& username, const string& service, const json& val);
 
-	Json::Value AppDecryptIdentifiers(const string& appid);
-	void AppEncryptIdentifiers(const string& appid, const Json::Value& val);
+	json AppDecryptIdentifiers(const string& appid);
+	void AppEncryptIdentifiers(const string& appid, const json& val);
 
 
 	bool hasApplication(const string& app);
@@ -102,8 +103,9 @@ private:
 	Crypto idcrypto;
 	AutoSeededRandomPool rnd;
 
-    unique_ptr<Json::StreamWriter> writer;
-	Json::Value data;
+	json data;
+
+	static const vector<byte> iv;
 };
 
 typedef std::shared_ptr<CryptoStorage> CryptoStoragePtr;

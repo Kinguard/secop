@@ -8,6 +8,7 @@
 #include <libutils/FileUtils.h>
 #include <libutils/Logger.h>
 
+#include <utility>
 #include <vector>
 
 #include "CryptoStorage.h"
@@ -15,7 +16,7 @@
 using namespace Utils;
 
 //TODO: Change to something a bit more random?
-static vector<byte> iv=
+const vector<byte> CryptoStorage::iv=
 		{
 				1,2,3,4,
 				5,6,7,8,
@@ -27,12 +28,12 @@ void CryptoStorage::New()
 {
 	this->data.clear();
 
-	this->data["user"]=Json::nullValue;
+	this->data["user"]=json();
 
-	this->data["group"]=Json::nullValue;
-	this->data["group"]["admin"]=Json::arrayValue;
+	this->data["group"]=json();
+	this->data["group"]["admin"]=json::array();
 
-	this->data["system"]=Json::nullValue;
+	this->data["system"]=json();
 	this->data["config"]["version"]=this->version;
 
 	this->Write();
@@ -41,12 +42,6 @@ void CryptoStorage::New()
 void
 CryptoStorage::Initialize ()
 {
-    // Initialize StreamWriter
-
-    Json::StreamWriterBuilder builder;
-
-    this->writer = unique_ptr<Json::StreamWriter>(builder.newStreamWriter());
-
 	if( ! File::FileExists( path ) )
 	{
 		logg << Logger::Debug << "Creating new storage at "<<this->path<<lend;
@@ -61,8 +56,8 @@ CryptoStorage::Initialize ()
 
 
 
-CryptoStorage::CryptoStorage (const string& path, const SecString& pwd , bool undertest)
-	:version(1.0), readversion(0), path(path), undertest(undertest)
+CryptoStorage::CryptoStorage (string  path, const SecString& pwd , bool undertest)
+	:version(1.0), readversion(0), path(std::move(path)), undertest(undertest)
 {
 	SecVector<byte> key = Crypto::PBKDF2(pwd,32);
 	this->key = key;
@@ -71,15 +66,15 @@ CryptoStorage::CryptoStorage (const string& path, const SecString& pwd , bool un
 }
 
 
-CryptoStorage::CryptoStorage (const string& path, const SecVector<byte>& key, bool undertest)
-	:version(1.0),readversion(0), path(path), undertest(undertest), key(key), filecrypto(key, iv)
+CryptoStorage::CryptoStorage (string  path, const SecVector<byte>& key, bool undertest)
+	:version(1.0),readversion(0), path(std::move(path)), undertest(undertest), key(key), filecrypto(key, iv)
 {
 	this->Initialize();
 }
 
 bool CryptoStorage::HasAppID(const string &appid)
 {
-	return this->data["system"].isMember(appid);
+	return this->data["system"].contains(appid);
 }
 
 void CryptoStorage::CreateAppID(const string &appid)
@@ -88,7 +83,7 @@ void CryptoStorage::CreateAppID(const string &appid)
 	{
 		throw std::runtime_error("Appid already exists");
 	}
-	this->data["system"][appid]["attributes"]=Json::nullValue;
+	this->data["system"][appid]["attributes"]=json();
 
 	this->Write();
 
@@ -98,7 +93,7 @@ void CryptoStorage::DeleteAppID(const string &appid)
 {
 	if( this->HasAppID( appid ) )
 	{
-		this->data["system"].removeMember(appid);
+		this->data["system"].erase(appid);
 	}
 	else
 	{
@@ -109,12 +104,17 @@ void CryptoStorage::DeleteAppID(const string &appid)
 
 vector<string> CryptoStorage::GetAppIDs()
 {
-	return this->data["system"].getMemberNames();
+	vector<string> ret;
+	for(const auto& system: this->data["system"].items() )
+	{
+		ret.push_back(system.key());
+	}
+	return ret;
 }
 
 bool CryptoStorage::HasGroup(const string &group)
 {
-	return this->data["group"].isMember(group);
+	return this->data["group"].contains(group);
 }
 
 void CryptoStorage::GroupAdd(const string &group)
@@ -123,13 +123,18 @@ void CryptoStorage::GroupAdd(const string &group)
 	{
 		throw std::runtime_error("Group exists");
 	}
-	this->data["group"][group]=Json::arrayValue;
+	this->data["group"][group]=json::array();
 	this->Write();
 }
 
 vector<string> CryptoStorage::GroupsGet()
 {
-	return this->data["group"].getMemberNames();
+	vector<string> ret;
+	for(const auto& group: this->data["group"].items() )
+	{
+		ret.push_back(group.key());
+	}
+	return ret;
 }
 
 void CryptoStorage::GroupAddMember(const string &group, const string &member)
@@ -139,16 +144,16 @@ void CryptoStorage::GroupAddMember(const string &group, const string &member)
 		throw std::runtime_error("Group doesn't' exists");
 	}
 
-	Json::Value members = this->data["group"][group];
+	json members = this->data["group"][group];
 
 	bool found = false;
 	for_each(members.begin(), members.end(),
-			 [&found, member](Json::Value v){ if(v.asString() == member ){ found=true;}}
+			 [&found, member](const json& v){ if(v.get<string>() == member ){ found=true;}}
 	);
 
 	if( ! found )
 	{
-		members.append(member);
+		members.push_back(member);
 		this->data["group"][group] = members;
 		this->Write();
 	}
@@ -161,15 +166,15 @@ void CryptoStorage::GroupRemoveMember(const string &group, const string &member)
 		throw std::runtime_error("Group doesn't' exists");
 	}
 
-	Json::Value members = this->data["group"][group];
-	Json::Value replace(Json::arrayValue);
+	json members = this->data["group"][group];
+	json replace = json::array();
 
 	bool removed = false;
-	for(auto mem: members)
+	for(const auto& mem: members)
 	{
-		if( mem.asString() != member )
+		if( mem.get<string>() != member )
 		{
-			replace.append(mem);
+			replace.push_back(mem);
 		}
 		else
 		{
@@ -193,10 +198,10 @@ vector<string> CryptoStorage::GroupGetMembers(const string &group)
 
 	vector<string> ret;
 
-	Json::Value members = this->data["group"][group];
-	for(auto member: members)
+	json members = this->data["group"][group];
+	for(const auto& member: members)
 	{
-		ret.push_back( member.asString() );
+		ret.push_back( member.get<string>() );
 	}
 	return ret;
 }
@@ -208,7 +213,7 @@ void CryptoStorage::GroupRemove(const string &group)
 		throw std::runtime_error("Group doesn't' exists");
 	}
 
-	this->data["group"].removeMember(group);
+	this->data["group"].erase(group);
 	this->Write();
 }
 
@@ -220,10 +225,10 @@ bool CryptoStorage::GroupHasMember(const string &group, const string &member)
 	}
 
 	bool found = false;
-	Json::Value members = this->data["group"][group];
-	for(auto mem: members)
+	json members = this->data["group"][group];
+	for(const auto& mem: members)
 	{
-		if( mem.asString() == member )
+		if( mem.get<string>() == member )
 		{
 			found = true;
 		}
@@ -232,22 +237,22 @@ bool CryptoStorage::GroupHasMember(const string &group, const string &member)
 	return found;
 }
 
-void CryptoStorage::AppAddIdentifier(const string &appid, const Json::Value &val)
+void CryptoStorage::AppAddIdentifier(const string &appid, const json &val)
 {
-	Json::Value ids = this->AppGetIdentifiers( appid );
+	json ids = this->AppGetIdentifiers( appid );
 
-	ids.append(val);
+	ids.push_back(val);
 
 	this->AppUpdateIdentifiers( appid, ids );
 }
 
-Json::Value CryptoStorage::AppGetIdentifiers(const string &appid)
+json CryptoStorage::AppGetIdentifiers(const string &appid)
 {
 
-	if( this->data["system"][appid].isMember("identifiers") )
+	if( this->data["system"][appid].contains("identifiers") )
 	{
 		// Element is present, verify
-		if( ! this->data["system"][appid]["identifiers"].isString() )
+		if( ! this->data["system"][appid]["identifiers"].is_string() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
@@ -255,15 +260,15 @@ Json::Value CryptoStorage::AppGetIdentifiers(const string &appid)
 	else
 	{
 		// Not present, create
-		this->AppUpdateIdentifiers(appid, Json::Value(Json::arrayValue) );
+		this->AppUpdateIdentifiers(appid, json::array() );
 	}
 	return this->AppDecryptIdentifiers( appid );
 }
 
-void CryptoStorage::AppUpdateIdentifiers(const string &appid, const Json::Value &val)
+void CryptoStorage::AppUpdateIdentifiers(const string &appid, const json &val)
 {
 
-	if( ! val.isArray() )
+	if( ! val.is_array() )
 	{
 		throw std::runtime_error("Identifiers not array");
 	}
@@ -280,10 +285,10 @@ void CryptoStorage::AppAddAcl(const string &appid, const string &entity)
 		throw std::runtime_error("Appid unknown");
 	}
 
-	if( this->data["system"][appid].isMember("acl") )
+	if( this->data["system"][appid].contains("acl") )
 	{
 		// Element is present, verify
-		if( ! this->data["system"][appid]["acl"].isArray() )
+		if( ! this->data["system"][appid]["acl"].is_array() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
@@ -291,14 +296,14 @@ void CryptoStorage::AppAddAcl(const string &appid, const string &entity)
 	else
 	{
 		// Not present, create
-		this->data["system"][appid]["acl"]=Json::Value(Json::arrayValue);
+		this->data["system"][appid]["acl"]=json::array();
 	}
 
 	bool found = false;
 
-	for(auto v : this->data["system"][appid]["acl"] )
+	for(const auto& v : this->data["system"][appid]["acl"] )
 	{
-		if( v.isString() && v.asString() == entity )
+		if( v.is_string() && v.get<string>() == entity )
 		{
 			found = true;
 		}
@@ -306,7 +311,7 @@ void CryptoStorage::AppAddAcl(const string &appid, const string &entity)
 
 	if( ! found )
 	{
-		this->data["system"][appid]["acl"].append( Json::Value( entity ) );
+		this->data["system"][appid]["acl"].push_back( json( entity ) );
 
 		this->Write();
 	}
@@ -320,20 +325,20 @@ bool CryptoStorage::AppHasACL(const string &appid, const string &entity)
 		throw std::runtime_error("User unknown");
 	}
 
-	if( ! this->data["system"][appid].isMember("acl") )
+	if( ! this->data["system"][appid].contains("acl") )
 	{
 		return false;
 	}
 
-	if( ! this->data["system"][appid]["acl"].isArray() )
+	if( ! this->data["system"][appid]["acl"].is_array() )
 	{
 		throw std::runtime_error("Malformed syntax in storage");
 	}
 
 	bool found = false;
-	for( auto x: this->data["system"][appid]["acl"] )
+	for( const auto& x: this->data["system"][appid]["acl"] )
 	{
-		if( x.isString() && x.asString() == entity )
+		if( x.is_string() && x.get<string>() == entity )
 		{
 			found = true;
 			break;
@@ -349,12 +354,12 @@ bool CryptoStorage::AppACLEmpty(const string &appid)
 		throw std::runtime_error("User unknown");
 	}
 
-	if( ! this->data["system"][appid].isMember("acl") )
+	if( ! this->data["system"][appid].contains("acl") )
 	{
 		return true;
 	}
 
-	if( ! this->data["system"][appid]["acl"].isArray() )
+	if( ! this->data["system"][appid]["acl"].is_array() )
 	{
 		throw std::runtime_error("Malformed syntax in storage");
 	}
@@ -370,10 +375,10 @@ vector<string> CryptoStorage::AppGetACL(const string &appid)
 		throw std::runtime_error("Appid unknown");
 	}
 
-	if( this->data["system"][appid].isMember("acl") )
+	if( this->data["system"][appid].contains("acl") )
 	{
 		// Element is present, verify
-		if( ! this->data["system"][appid]["acl"].isArray() )
+		if( ! this->data["system"][appid]["acl"].is_array() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
@@ -381,16 +386,16 @@ vector<string> CryptoStorage::AppGetACL(const string &appid)
 	else
 	{
 		// Not present, create
-		this->data["system"][appid]["acl"]=Json::Value(Json::arrayValue);
+		this->data["system"][appid]["acl"]=json::array();
 	}
 
 	vector<string> ret;
-	Json::Value acl = this->data["system"][appid]["acl"];
-	for( auto ent: acl)
+	json acl = this->data["system"][appid]["acl"];
+	for( const auto& ent: acl)
 	{
-		if( ent.isString() )
+		if( ent.is_string() )
 		{
-			ret.push_back(ent.asString());
+			ret.push_back(ent.get<string>());
 		}
 	}
 	return ret;
@@ -403,22 +408,22 @@ void CryptoStorage::AppRemoveAcl(const string &appid, const string &entity)
 		throw std::runtime_error("Appid unknown");
 	}
 
-	if( this->data["system"][appid].isMember("acl") )
+	if( this->data["system"][appid].contains("acl") )
 	{
 		// Element is present, verify
-		if( ! this->data["system"][appid]["acl"].isArray() )
+		if( ! this->data["system"][appid]["acl"].is_array() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
 	}
 
-	Json::Value newArray(Json::arrayValue);
+	json newArray = json::array();
 	bool removed = false;
-	for( auto x: this->data["system"][appid]["acl"] )
+	for( const auto& x: this->data["system"][appid]["acl"] )
 	{
-		if( x.isString() && x.asString() != entity )
+		if( x.is_string() && x.get<string>() != entity )
 		{
-			newArray.append(x.asString() );
+			newArray.push_back(x.get<string>() );
 		}
 		else
 		{
@@ -433,9 +438,7 @@ void CryptoStorage::AppRemoveAcl(const string &appid, const string &entity)
 	}
 }
 
-CryptoStorage::~CryptoStorage ()
-{
-}
+CryptoStorage::~CryptoStorage () = default;
 
 void
 CryptoStorage::Read ()
@@ -450,20 +453,22 @@ CryptoStorage::Read ()
 		logg << Logger::Debug << "Content ["<<cnt.str() <<"]"<<lend;
 	}
 
-    Json::CharReaderBuilder builder;
-    builder["collectComments"] = false;
-    Json::Value ret(Json::arrayValue);
+	json ret = json::array();
     string errs;
-    if( ! Json::parseFromStream(builder, cnt, &this->data, &errs) )
-    {
-        logg << Logger::Error << "Failed to parse storage at "<<this->path << " Errors " << errs <<lend;
-        throw std::runtime_error(errs);
-    }
+	try
+	{
+		cnt >> this->data;
+	}
+	catch (json::parse_error& err)
+	{
+		logg << Logger::Error << "Failed to parse storage at "<<this->path << " ( " << err.what() << ")" <<lend;
+		throw;
+	}
 
     logg << Logger::Debug << "Read storage at"<< this->path <<lend;
-    if( data["config"].isMember("version") && data["config"]["version"].isDouble() )
+	if( data["config"].contains("version") && data["config"]["version"].is_number_float() )
     {
-        this->readversion = this->data["config"]["version"].asDouble();
+		this->readversion = this->data["config"]["version"].get<double>();
         logg << Logger::Debug << "Storage file has version "<< static_cast<int>(this->readversion) << lend;
     }
     else
@@ -486,7 +491,7 @@ CryptoStorage::AddService ( const string& username, const string& servicename )
 		throw std::runtime_error("Service already added");
 	}
 
-	this->data["user"][username]["services"][servicename]["acl"] = Json::Value(Json::arrayValue);
+	this->data["user"][username]["services"][servicename]["acl"] = json::array();
 
 	this->Write();
 }
@@ -504,7 +509,7 @@ CryptoStorage::RemoveService( const string& username, const string& servicename 
 		throw std::runtime_error("Service not found for user");
 	}
 
-	this->data["user"][username]["services"].removeMember(servicename);
+	this->data["user"][username]["services"].erase(servicename);
 
 	this->Write();
 }
@@ -516,7 +521,13 @@ CryptoStorage::GetServices(const string &username)
 	{
 		throw std::runtime_error("User unknown in get services");
 	}
-	return this->data["user"][username]["services"].getMemberNames();
+
+	vector<string> ret;
+	for(const auto& service: this->data["user"][username]["services"].items() )
+	{
+		ret.push_back(service.key());
+	}
+	return ret;
 }
 
 vector<string>
@@ -527,10 +538,10 @@ CryptoStorage::GetACL(const string& username, const string& service)
 		throw std::runtime_error("Service unknown");
 	}
 
-	if( this->data["user"][username]["services"][service].isMember("acl") )
+	if( this->data["user"][username]["services"][service].contains("acl") )
 	{
 		// Element is present, verify
-		if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
+		if( ! this->data["user"][username]["services"][service]["acl"].is_array() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
@@ -538,16 +549,16 @@ CryptoStorage::GetACL(const string& username, const string& service)
 	else
 	{
 		// Not present, create
-		this->data["user"][username]["services"][service]["acl"]=Json::Value(Json::arrayValue);
+		this->data["user"][username]["services"][service]["acl"]=json::array();
 	}
 
 	vector<string> ret;
-	Json::Value acl = this->data["user"][username]["services"][service]["acl"];
-	for( auto ent: acl)
+	json acl = this->data["user"][username]["services"][service]["acl"];
+	for( const auto& ent: acl)
 	{
-		if( ent.isString() )
+		if( ent.is_string() )
 		{
-			ret.push_back(ent.asString());
+			ret.push_back(ent.get<string>());
 		}
 	}
 	return ret;
@@ -562,10 +573,10 @@ CryptoStorage::AddAcl ( const string& username, const string& service,
 		throw std::runtime_error("Service unknown");
 	}
 
-	if( this->data["user"][username]["services"][service].isMember("acl") )
+	if( this->data["user"][username]["services"][service].contains("acl") )
 	{
 		// Element is present, verify
-		if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
+		if( ! this->data["user"][username]["services"][service]["acl"].is_array() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
@@ -573,14 +584,14 @@ CryptoStorage::AddAcl ( const string& username, const string& service,
 	else
 	{
 		// Not present, create
-		this->data["user"][username]["services"][service]["acl"]=Json::Value(Json::arrayValue);
+		this->data["user"][username]["services"][service]["acl"]=json::array();
 	}
 
 	bool found = false;
 
-	for(auto v : this->data["user"][username]["services"][service]["acl"] )
+	for(const auto& v : this->data["user"][username]["services"][service]["acl"] )
 	{
-        if( v.isString() && v.asString() == entity )
+		if( v.is_string() && v.get<string>() == entity )
 		{
 			found = true;
 		}
@@ -588,7 +599,7 @@ CryptoStorage::AddAcl ( const string& username, const string& service,
 
 	if( ! found )
 	{
-		this->data["user"][username]["services"][service]["acl"].append( Json::Value( entity ) );
+		this->data["user"][username]["services"][service]["acl"].push_back( json( entity ) );
 
 		this->Write();
 	}
@@ -601,22 +612,22 @@ CryptoStorage::RemoveAcl(const string &username, const string &service, const st
 		throw std::runtime_error("Service unknown");
 	}
 
-	if( this->data["user"][username]["services"][service].isMember("acl") )
+	if( this->data["user"][username]["services"][service].contains("acl") )
 	{
 		// Element is present, verify
-		if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
+		if( ! this->data["user"][username]["services"][service]["acl"].is_array() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
 	}
 
-	Json::Value newArray(Json::arrayValue);
+	json newArray = json::array();
 	bool removed = false;
-	for( auto x: this->data["user"][username]["services"][service]["acl"] )
+	for( const auto& x: this->data["user"][username]["services"][service]["acl"] )
 	{
-		if( x.isString() && x.asString() != entity )
+		if( x.is_string() && x.get<string>() != entity )
 		{
-			newArray.append(x.asString() );
+			newArray.push_back(x.get<string>() );
 		}
 		else
 		{
@@ -644,12 +655,12 @@ CryptoStorage::ACLEmpty(const string &username, const string &service)
 		throw std::runtime_error("Service not found for user");
 	}
 
-	if( ! this->data["user"][username]["services"][service].isMember("acl") )
+	if( ! this->data["user"][username]["services"][service].contains("acl") )
 	{
 		return true;
 	}
 
-	if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
+	if( ! this->data["user"][username]["services"][service]["acl"].is_array() )
 	{
 		throw std::runtime_error("Malformed syntax in storage");
 	}
@@ -671,20 +682,20 @@ CryptoStorage::HasACL(const string &username, const string &service, const strin
 		throw std::runtime_error("Service not found for user");
 	}
 
-	if( ! this->data["user"][username]["services"][service].isMember("acl") )
+	if( ! this->data["user"][username]["services"][service].contains("acl") )
 	{
 		return false;
 	}
 
-	if( ! this->data["user"][username]["services"][service]["acl"].isArray() )
+	if( ! this->data["user"][username]["services"][service]["acl"].is_array() )
 	{
 		throw std::runtime_error("Malformed syntax in storage");
 	}
 
 	bool found = false;
-	for( auto x: this->data["user"][username]["services"][service]["acl"] )
+	for( const auto& x: this->data["user"][username]["services"][service]["acl"] )
 	{
-		if( x.isString() && x.asString() == entity )
+		if( x.is_string() && x.get<string>() == entity )
 		{
 			found = true;
 			break;
@@ -695,16 +706,16 @@ CryptoStorage::HasACL(const string &username, const string &service, const strin
 
 void
 CryptoStorage::AddIdentifier ( const string& username, const string& service,
-		const Json::Value& val )
+		const json& val )
 {
-	Json::Value ids = this->GetIdentifiers(username, service );
+	json ids = this->GetIdentifiers(username, service );
 
-	ids.append(val);
+	ids.push_back(val);
 
 	this->UpdateIdentifiers(username, service, ids);
 }
 
-Json::Value
+json
 CryptoStorage::GetIdentifiers ( const string& username, const string& service )
 {
 	if( ! this->HasService(username, service) )
@@ -712,10 +723,10 @@ CryptoStorage::GetIdentifiers ( const string& username, const string& service )
 		throw std::runtime_error("No such service");
 	}
 
-	if( this->data["user"][username]["services"][service].isMember("identifiers") )
+	if( this->data["user"][username]["services"][service].contains("identifiers") )
 	{
 		// Element is present, verify
-		if( ! this->data["user"][username]["services"][service]["identifiers"].isString() )
+		if( ! this->data["user"][username]["services"][service]["identifiers"].is_string() )
 		{
 			throw std::runtime_error("Malformed syntax in storage");
 		}
@@ -723,21 +734,21 @@ CryptoStorage::GetIdentifiers ( const string& username, const string& service )
 	else
 	{
 		// Not present, create
-		this->UpdateIdentifiers(username, service, Json::Value(Json::arrayValue) );
+		this->UpdateIdentifiers(username, service, json::array() );
 	}
 	return this->DecryptIdentifiers(username,service);
 }
 
 void
 CryptoStorage::UpdateIdentifiers ( const string& username,
-		const string& service, const Json::Value& val )
+		const string& service, const json& val )
 {
 	if( ! this->HasService(username, service) )
 	{
 		throw std::runtime_error("No such service");
 	}
 
-	if( ! val.isArray() )
+	if( ! val.is_array() )
 	{
 		throw std::runtime_error("Identifiers not array");
 	}
@@ -757,7 +768,8 @@ CryptoStorage::Write ()
 	}
 
 	stringstream output;
-	this->writer->write(this->data, &output);
+	output << this->data;
+
 	string enc = this->filecrypto.Encrypt(output.str());
 
 	vector<byte> vout(enc.begin(), enc.end());
@@ -772,7 +784,7 @@ CryptoStorage::CreateUser (const string& username , const string &displayname)
 	{
 		throw std::runtime_error("User already exists");
 	}
-	this->data["user"][username]["services"]=Json::nullValue;
+	this->data["user"][username]["services"]=json();
 
 	if( displayname != "" )
 	{
@@ -780,7 +792,7 @@ CryptoStorage::CreateUser (const string& username , const string &displayname)
 	}
 	else
 	{
-		this->data["user"][username]["attributes"]=Json::nullValue;
+		this->data["user"][username]["attributes"]=json();
 	}
 	this->Write();
 }
@@ -792,7 +804,7 @@ CryptoStorage::CreateApplication ( const string& appname )
 	{
 		throw std::runtime_error("User already exists");
 	}
-	this->data["system"][appname]=Json::nullValue;
+	this->data["system"][appname]=json();
 
 	this->Write();
 }
@@ -800,13 +812,18 @@ CryptoStorage::CreateApplication ( const string& appname )
 bool
 CryptoStorage::HasUser (const string& user)
 {
-	return this->data["user"].isMember(user);
+	return this->data["user"].contains(user);
 }
 
 vector<string>
 CryptoStorage::GetUsers()
 {
-	return this->data["user"].getMemberNames();
+	vector<string> ret;
+	for(const auto& user: this->data["user"].items() )
+	{
+		ret.push_back(user.key());
+	}
+	return ret;
 }
 
 bool CryptoStorage::HasAttribute(const string &username, const string &attributename)
@@ -815,7 +832,7 @@ bool CryptoStorage::HasAttribute(const string &username, const string &attribute
 	{
 		return false;
 	}
-	return this->data["user"][username]["attributes"].isMember(attributename);
+	return this->data["user"][username]["attributes"].contains(attributename);
 
 }
 
@@ -825,8 +842,7 @@ vector<string> CryptoStorage::GetAttributes(const string &username)
 	{
 		throw std::runtime_error("User not found");
 	}
-
-	return this->data["user"][username]["attributes"].getMemberNames();
+	return vector<string>(this->data["user"][username]["attributes"].begin(),this->data["user"][username]["attributes"].end());
 }
 
 string CryptoStorage::GetAttribute(const string &username, const string &attributename)
@@ -836,10 +852,10 @@ string CryptoStorage::GetAttribute(const string &username, const string &attribu
 		throw std::runtime_error("User or attribute not found");
 	}
 
-	return this->data["user"][username]["attributes"][attributename].asString();
+	return this->data["user"][username]["attributes"][attributename].get<string>();
 }
 
-void CryptoStorage::AddAttribute(const string &username, const string &attributename, const string attributevalue)
+void CryptoStorage::AddAttribute(const string &username, const string &attributename, const string& attributevalue)
 {
 	if( ! this->HasUser(username) )
 	{
@@ -863,7 +879,7 @@ void CryptoStorage::RemoveAttribute(const string &username, const string &attrib
 		throw std::runtime_error("Attribute not found");
 	}
 
-	this->data["user"][username]["attributes"].removeMember(attributename);
+	this->data["user"][username]["attributes"].erase(attributename);
 
 	this->Write();
 }
@@ -871,42 +887,36 @@ void CryptoStorage::RemoveAttribute(const string &username, const string &attrib
 bool
 CryptoStorage::HasService ( const string& user, const string& service )
 {
-	return this->data["user"][user]["services"].isMember(service);
+	return this->data["user"][user]["services"].contains(service);
 }
 
 bool
 CryptoStorage::hasApplication (const string& app)
 {
-	return this->data["system"].isMember(app);
+	return this->data["system"].contains(app);
 }
 
-Json::Value
+json
 CryptoStorage::DecryptIdentifiers(const string& username, const string& service)
 {
 	vector<byte> iv;
 
-	Crypto::Base64Decode(this->data["user"][username]["services"][service]["iv"].asString(), iv);
+	Crypto::Base64Decode(this->data["user"][username]["services"][service]["iv"].get<string>(), iv);
 
 	vector<byte> val;
-	Crypto::Base64Decode(this->data["user"][username]["services"][service]["identifiers"].asString(), val);
+	Crypto::Base64Decode(this->data["user"][username]["services"][service]["identifiers"].get<string>(), val);
 
 	this->idcrypto.Initialize(this->key, iv);
     stringstream ids( this->idcrypto.Decrypt(val) );
 
-    Json::CharReaderBuilder builder;
-    builder["collectComments"] = false;
-    Json::Value ret(Json::arrayValue);
-    string errs;
-    if( ! Json::parseFromStream(builder, ids, &ret, &errs) )
-    {
-        throw std::runtime_error(errs);
-    }
+	json ret;
+	ids >> ret;
 
 	return ret;
 }
 
 void
-CryptoStorage::EncryptIdentifiers(const string& username, const string& service, const Json::Value& val)
+CryptoStorage::EncryptIdentifiers(const string& username, const string& service, const json& val)
 {
 	// Generate and save new IV
 	vector<byte> iv(AES::BLOCKSIZE);
@@ -916,8 +926,9 @@ CryptoStorage::EncryptIdentifiers(const string& username, const string& service,
 	this->data["user"][username]["services"][service]["iv"]=b64iv;
 
 	this->idcrypto.Initialize(this->key, iv);
-    stringstream output;
-    this->writer->write(val, &output);
+	stringstream output;
+	output << val;
+
 	string b64val = Crypto::Base64Encode(
             this->idcrypto.Encrypt( output.str() )
 			);
@@ -925,31 +936,21 @@ CryptoStorage::EncryptIdentifiers(const string& username, const string& service,
 	this->data["user"][username]["services"][service]["identifiers"] = b64val;
 }
 
-Json::Value CryptoStorage::AppDecryptIdentifiers(const string &appid)
+json CryptoStorage::AppDecryptIdentifiers(const string &appid)
 {
 	vector<byte> iv;
 
-	Crypto::Base64Decode(this->data["system"][appid]["iv"].asString(), iv);
+	Crypto::Base64Decode(this->data["system"][appid]["iv"].get<string>(), iv);
 
 	vector<byte> val;
-	Crypto::Base64Decode(this->data["system"][appid]["identifiers"].asString(), val);
+	Crypto::Base64Decode(this->data["system"][appid]["identifiers"].get<string>(), val);
 
 	this->idcrypto.Initialize(this->key, iv);
-    stringstream ids(this->idcrypto.Decrypt(val));
 
-    Json::CharReaderBuilder builder;
-    builder["collectComments"] = false;
-    Json::Value ret(Json::arrayValue);
-    string errs;
-    if( ! Json::parseFromStream(builder, ids, &ret, &errs) )
-    {
-        throw std::runtime_error(errs);
-    }
-
-	return ret;
+	return json::parse(this->idcrypto.Decrypt(val));
 }
 
-void CryptoStorage::AppEncryptIdentifiers(const string &appid, const Json::Value &val)
+void CryptoStorage::AppEncryptIdentifiers(const string &appid, const json &val)
 {
 	// Generate and save new IV
 	vector<byte> iv(AES::BLOCKSIZE);
@@ -961,7 +962,8 @@ void CryptoStorage::AppEncryptIdentifiers(const string &appid, const Json::Value
 	this->idcrypto.Initialize(this->key, iv);
 
     stringstream output;
-    this->writer->write( val, & output);
+	output << val;
+
 	string b64val = Crypto::Base64Encode(
             this->idcrypto.Encrypt( output.str() )
 			);
@@ -975,7 +977,7 @@ CryptoStorage::DeleteUser ( const string& username )
 {
 	if( this->HasUser( username ) )
 	{
-		this->data["user"].removeMember(username);
+		this->data["user"].erase(username);
 	}
 	else
 	{

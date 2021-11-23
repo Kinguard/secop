@@ -5,7 +5,8 @@ include( FindPkgConfig )
 
 pkg_check_modules ( LIBCRYPTO++ REQUIRED libcrypto++>=5.6.1 )
 pkg_check_modules ( LIBUTILS REQUIRED libutils>=1.5.18)
-#pkg_check_modules ( LIBJSONCPP REQUIRED jsoncpp>=1.0 )
+
+find_package(nlohmann_json 3.2.0 REQUIRED)
 
 set (SECOP_VERSION_MAJOR 1)
 set (SECOP_VERSION_MINOR 0)
@@ -18,7 +19,6 @@ configure_file (
 include_directories("${PROJECT_BINARY_DIR}")
 
 add_subdirectory( src )
-add_subdirectory( jsoncpp )
 add_subdirectory( test )
 
 set( secop_src
@@ -27,14 +27,13 @@ set( secop_src
 
 include_directories (
 	"${PROJECT_SOURCE_DIR}/src"
-        "${PROJECT_SOURCE_DIR}/jsoncpp"
 	)
 
-add_definitions( -std=c++11 -Wall )
+add_definitions( -Wall -Werror )
 
 add_executable( secop ${secop_src} )
 
-target_link_libraries( secop applib jsoncpplib ${LIBUTILS_LDFLAGS})
+target_link_libraries( secop applib ${LIBUTILS_LDFLAGS})
 
 enable_testing()
 add_test( NAME TestSecop COMMAND testsecop )

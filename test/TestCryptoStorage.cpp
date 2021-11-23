@@ -36,13 +36,13 @@ void TestCryptoStorage::TestBasic()
 void TestCryptoStorage::TestUser()
 {
 	CryptoStorage c("/tmp/cstest.db","My Password");
-
 	CPPUNIT_ASSERT( ! c.HasUser("test") );
 	CPPUNIT_ASSERT_NO_THROW( c.CreateUser("test") );
 	CPPUNIT_ASSERT( c.HasUser("test") );
 	CPPUNIT_ASSERT_THROW( c.CreateUser("test"), std::runtime_error );
 
 	vector<string> u=c.GetUsers();
+
 	CPPUNIT_ASSERT( u.size() == 2 );
 	CPPUNIT_ASSERT( find(u.begin(), u.end(),"tmp") != u.end() );
 	CPPUNIT_ASSERT( find(u.begin(), u.end(),"test") != u.end() );
@@ -158,7 +158,7 @@ void TestCryptoStorage::TestIdentifiers()
 
 	CPPUNIT_ASSERT_NO_THROW( c.GetIdentifiers("tmp","test"));
 
-	Json::Value id(Json::objectValue);
+	json id;
 	id["user"]="user";
 	id["password"]="password";
 	id["service"]="service";
@@ -166,21 +166,21 @@ void TestCryptoStorage::TestIdentifiers()
 
 	CPPUNIT_ASSERT_NO_THROW( c.AddIdentifier("tmp","test",id));
 
-	Json::Value ret = c.GetIdentifiers("tmp","test");
+	json ret = c.GetIdentifiers("tmp","test");
 
 	CPPUNIT_ASSERT( ret.size() == 1 );
-	Json::Value idr = ret[0u];
-	CPPUNIT_ASSERT( idr["user"].asString() == "user" );
-	CPPUNIT_ASSERT( idr["password"].asString() == "password" );
-	CPPUNIT_ASSERT( idr["service"].asString() == "service" );
-	CPPUNIT_ASSERT( idr["comment"].asString() == "comment" );
+	json idr = ret[0u];
+	CPPUNIT_ASSERT( idr["user"].get<string>() == "user" );
+	CPPUNIT_ASSERT( idr["password"].get<string>() == "password" );
+	CPPUNIT_ASSERT( idr["service"].get<string>() == "service" );
+	CPPUNIT_ASSERT( idr["comment"].get<string>() == "comment" );
 	idr["user"]="new user";
 	CPPUNIT_ASSERT_NO_THROW( c.AddIdentifier("tmp","test",idr));
 
-	Json::Value ret2 = c.GetIdentifiers("tmp","test");
+	json ret2 = c.GetIdentifiers("tmp","test");
 	CPPUNIT_ASSERT_EQUAL( (int)ret2.size(), 2 );
-	CPPUNIT_ASSERT( ret2[1]["user"].asString() == "new user");
-	CPPUNIT_ASSERT( ret2[0u]["user"].asString() == "user");
+	CPPUNIT_ASSERT( ret2[1]["user"].get<string>() == "new user");
+	CPPUNIT_ASSERT( ret2[0u]["user"].get<string>() == "user");
 }
 
 void TestCryptoStorage::TestAttributes()
@@ -236,7 +236,7 @@ void TestCryptoStorage::TestAppid()
 	CPPUNIT_ASSERT_EQUAL( c.GetAppIDs().size(), (size_t) 1);
 	CPPUNIT_ASSERT_THROW( c.DeleteAppID("id2"), std::runtime_error );
 
-	Json::Value id(Json::objectValue);
+	json id;
 	id["user"]="user";
 	id["password"]="password";
 	id["service"]="service";
@@ -244,18 +244,18 @@ void TestCryptoStorage::TestAppid()
 
 	CPPUNIT_ASSERT_NO_THROW( c.AppAddIdentifier( "myappid", id) );
 
-	Json::Value ret = c.AppGetIdentifiers("myappid");
+	json ret = c.AppGetIdentifiers("myappid");
 
-	CPPUNIT_ASSERT_EQUAL( ret.size(), (unsigned int) 1 );
-	Json::Value idr = ret[0u];
-	CPPUNIT_ASSERT( idr["user"].asString() == "user" );
-	CPPUNIT_ASSERT( idr["password"].asString() == "password" );
-	CPPUNIT_ASSERT( idr["service"].asString() == "service" );
-	CPPUNIT_ASSERT( idr["comment"].asString() == "comment" );
+	CPPUNIT_ASSERT_EQUAL( ret.size(), (size_t) 1 );
+	json idr = ret[0u];
+	CPPUNIT_ASSERT( idr["user"].get<string>() == "user" );
+	CPPUNIT_ASSERT( idr["password"].get<string>() == "password" );
+	CPPUNIT_ASSERT( idr["service"].get<string>() == "service" );
+	CPPUNIT_ASSERT( idr["comment"].get<string>() == "comment" );
 
 	id["user"]="another user";
 	CPPUNIT_ASSERT_NO_THROW( c.AppAddIdentifier( "myappid", id) );
-	CPPUNIT_ASSERT_EQUAL( c.AppGetIdentifiers("myappid").size(), (unsigned int) 2 );
+	CPPUNIT_ASSERT_EQUAL( c.AppGetIdentifiers("myappid").size(), (size_t) 2 );
 
 }
 

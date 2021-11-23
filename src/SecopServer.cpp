@@ -14,12 +14,14 @@
 #include <pthread.h>
 
 #include <map>
+#include <memory>
+#include <utility>
 
 using namespace std;
 using namespace Utils;
 using namespace Utils::Net;
 
-#define OPIUSER "opiuser"
+constexpr const char* OPIUSER="opiuser";
 
 class PolicyController
 {
@@ -58,7 +60,7 @@ public:
 
 	}
 
-	bool Check(const string& actor, const string& policy )
+	bool Check(const string& actor, const string& policy ) const
 	{
 		if( this->pol.find(policy) == this->pol.end() )
 		{
@@ -72,25 +74,20 @@ public:
 		bool ret = false;
 		if( this->dfl.find(policy) != this->dfl.end() )
 		{
-			ret = this->dfl[policy];
+			ret = this->dfl.at(policy);
 		}
 
 		/* Check if user is mentioned */
-		if( this->pol[policy].find(actor) != this->pol[policy].end() )
+		if( this->pol.at(policy).find(actor) != this->pol.at(policy).end() )
 		{
-			ret = this->pol[policy][actor];
+			ret = this->pol.at(policy).at(actor);
 		}
 
 		return ret;
 	}
-
-	virtual ~PolicyController()
-	{
-
-	}
 };
 
-static PolicyController pc;
+static const PolicyController pc;
 
 
 struct threadinfo
@@ -99,18 +96,12 @@ struct threadinfo
 	SocketPtr client;
 };
 
-SecopServer::SecopServer (const string& socketpath, const string& dbpath):
-		Utils::Net::NetServer(UnixStreamServerSocketPtr( new UnixStreamServerSocket(socketpath)), 0),
+SecopServer::SecopServer (const string& socketpath, string dbpath):
+		Utils::Net::NetServer(std::make_shared<UnixStreamServerSocket>( socketpath), 0),
         state(UNINITIALIZED),
-        dbpath(dbpath)
+		dbpath(std::move(dbpath))
 {
 	logg << Logger::Debug << "Secop server starting"<<lend;
-
-    // Initialize StreamWriter
-    Json::StreamWriterBuilder builder;
-    builder["commentStyle"] = "None";
-    this->writer = unique_ptr<Json::StreamWriter>(builder.newStreamWriter());
-
 
 	// Setup commands possible
 	this->actions["init"]=make_pair(UNINITIALIZED, &SecopServer::DoInitialize);
@@ -178,11 +169,11 @@ SecopServer::Dispatch ( SocketPtr con )
 
 void
 SecopServer::ProcessOneCommand ( UnixStreamClientSocketPtr& client,
-		Json::Value& cmd, Json::Value& session )
+		json& cmd, json& session )
 {
 	ScopedLock l(this->biglock);
 
-	string action = cmd["cmd"].asString();
+	string action = cmd["cmd"].get<string>();
 
 	logg << Logger::Debug << "Process request of "<< action << lend;
 	if( this->actions.find(action) != this->actions.end() )
@@ -190,7 +181,7 @@ SecopServer::ProcessOneCommand ( UnixStreamClientSocketPtr& client,
 		unsigned char valid_states = this->actions[action].first;
 
 		if( this->state & valid_states ||
-				( ( valid_states & AUTHENTICATED) && session["user"]["authenticated"].asBool() ))
+				( ( valid_states & AUTHENTICATED) && session["user"]["authenticated"].get<bool>() ))
 		{
 			try
 			{
@@ -216,58 +207,57 @@ SecopServer::ProcessOneCommand ( UnixStreamClientSocketPtr& client,
 }
 
 void
-SecopServer::SendReply ( UnixStreamClientSocketPtr& client, Json::Value& val )
+SecopServer::SendReply ( UnixStreamClientSocketPtr& client, json& val )
 {
-    stringstream r;
-    writer->write(val, &r);
+	stringstream r(val.dump());
 
     client->Write(r.str().c_str(), r.str().length());
 }
 
 inline bool
-SecopServer::CheckAPIVersion ( const Json::Value& cmd )
+SecopServer::CheckAPIVersion ( const json& cmd )
 {
-	return !cmd.isNull() && cmd.isMember("version") && cmd["version"].isNumeric() && (cmd["version"].asDouble() == API_VERSION);
+	return !cmd.is_null() && cmd.contains("version") && cmd["version"].is_number_integer() && (cmd["version"].get<double>() == API_VERSION);
 }
 
 inline bool
-SecopServer::CheckTID ( const Json::Value& cmd )
+SecopServer::CheckTID ( const json& cmd )
 {
-	return !cmd.isNull() && cmd.isMember("tid") && cmd["tid"].isIntegral();
+	return !cmd.is_null() && cmd.contains("tid") && cmd["tid"].is_number_integer();
 }
 
 inline bool
-SecopServer::CheckUsername(const Json::Value& cmd)
+SecopServer::CheckUsername(const json& cmd)
 {
-	return !cmd.isNull() &&	cmd.isMember("username") && cmd["username"].isString();
+	return !cmd.is_null() &&	cmd.contains("username") && cmd["username"].is_string();
 
 }
 
 inline bool
-SecopServer::CheckService(const Json::Value& cmd)
+SecopServer::CheckService(const json& cmd)
 {
-	return !cmd.isNull() &&	cmd.isMember("servicename") && cmd["servicename"].isString();
+	return !cmd.is_null() &&	cmd.contains("servicename") && cmd["servicename"].is_string();
 }
 
 inline bool
-SecopServer::CheckAppID(const Json::Value& cmd)
+SecopServer::CheckAppID(const json& cmd)
 {
-	return !cmd.isNull() &&	cmd.isMember("appid") && cmd["appid"].isString();
+	return !cmd.is_null() &&	cmd.contains("appid") && cmd["appid"].is_string();
 }
 
-bool SecopServer::CheckGroup(const Json::Value &cmd)
+bool SecopServer::CheckGroup(const json &cmd)
 {
-	return !cmd.isNull() &&	cmd.isMember("group") && cmd["group"].isString();
+	return !cmd.is_null() &&	cmd.contains("group") && cmd["group"].is_string();
 }
 
-bool SecopServer::CheckMember(const Json::Value &cmd)
+bool SecopServer::CheckMember(const json &cmd)
 {
-	return !cmd.isNull() &&	cmd.isMember("member") && cmd["member"].isString();
+	return !cmd.is_null() &&	cmd.contains("member") && cmd["member"].is_string();
 }
 
-bool SecopServer::CheckPassword(const Json::Value &cmd)
+bool SecopServer::CheckPassword(const json &cmd)
 {
-	return !cmd.isNull() &&	cmd.isMember("password") && cmd["password"].isString();
+	return !cmd.is_null() &&	cmd.contains("password") && cmd["password"].is_string();
 }
 
 
@@ -287,7 +277,7 @@ bool SecopServer::AdminOrAllowed(const string &user, const string &policy)
 }
 
 bool
-SecopServer::CheckArguments(UnixStreamClientSocketPtr &client, int what, const Json::Value& cmd)
+SecopServer::CheckArguments(UnixStreamClientSocketPtr &client, int what, const json& cmd)
 {
 
 	if( ( what & CHK_API) && !SecopServer::CheckAPIVersion(cmd) )
@@ -343,9 +333,9 @@ SecopServer::CheckArguments(UnixStreamClientSocketPtr &client, int what, const J
 
 
 inline void
-SecopServer::SendErrorMessage ( UnixStreamClientSocketPtr& client, const Json::Value& cmd, int errcode, const string& msg )
+SecopServer::SendErrorMessage ( UnixStreamClientSocketPtr& client, const json& cmd, int errcode, const string& msg )
 {
-	Json::Value ret(Json::objectValue);
+	json ret;
 	ret["status"]["value"]=errcode;
 	ret["status"]["desc"]=msg;
 
@@ -358,9 +348,9 @@ SecopServer::SendErrorMessage ( UnixStreamClientSocketPtr& client, const Json::V
 }
 
 inline void
-SecopServer::SendOK (UnixStreamClientSocketPtr& client, const Json::Value& cmd, const Json::Value &val)
+SecopServer::SendOK (UnixStreamClientSocketPtr& client, const json& cmd, const json &val)
 {
-	Json::Value ret(Json::objectValue);
+	json ret;
 	ret["status"]["value"]=0;
 	ret["status"]["desc"]="OK";
 
@@ -370,12 +360,15 @@ SecopServer::SendOK (UnixStreamClientSocketPtr& client, const Json::Value& cmd, 
 	}
 
 	// Append any possible extra values to answer
-	if( ! val.isNull() )
+	if( ! val.is_null() )
 	{
+		ret.insert(val.begin(), val.end());
+/*
 		for( auto x: val.getMemberNames() )
 		{
 			ret[x]=val[x];
 		}
+*/
 	}
 
 	this->SendReply(client, ret);
@@ -406,26 +399,23 @@ void SecopServer::HandleClient(UnixStreamClientSocketPtr client)
 	size_t rd;
 	int errcount = 0;
 
-	Json::Value session;
+	json session;
 	session["user"]["authenticated"]=false;
 
 	logg << Logger::Debug << "Handle new client connection" << lend;
 
 	try
 	{
-        Json::CharReaderBuilder builder;
-        builder["collectComments"] = false;
 
 		while( (rd = client->Read(buf, sizeof(buf))) > 0 && errcount < 5 )
 		{
 			logg << "Read request of socket "<< static_cast<int>(rd) << " bytes." << lend;
-			Json::Value req;
-            string errs;
-            stringstream stream(string(buf, buf+rd));
-            if( Json::parseFromStream(builder, stream, &req, &errs ) )
-            //if( this->reader.parse(buf, buf+rd, req) )
+			json req;
+			try
 			{
-				if( req.isMember("cmd") && req["cmd"].isString() )
+				req = json::parse(buf,buf+rd);
+
+				if( req.contains("cmd") && req["cmd"].is_string() )
 				{
 					this->ProcessOneCommand(client, req, session);
 					// CMD "sucessful", reset counter
@@ -433,16 +423,17 @@ void SecopServer::HandleClient(UnixStreamClientSocketPtr client)
 				}
 				else
 				{
-					logg << Logger::Debug << "Missing command in request: ["<< req.toStyledString()<<"]"<<lend;
-					this->SendErrorMessage(client, Json::Value::null, 4, "Missing command in request");
+					logg << Logger::Debug << "Missing command in request: ["<< req.dump(4)<<"]"<<lend;
+					this->SendErrorMessage(client, json(), 4, "Missing command in request");
 					errcount++;
 				}
 			}
-			else
+			catch(json::parse_error& err)
 			{
 				logg << Logger::Notice << "Unable to parse request from client" << lend;
-				this->SendErrorMessage(client, Json::Value::null, 4, "Unable to parse request");
+				this->SendErrorMessage(client, json(), 4, "Unable to parse request");
 				errcount++;
+
 			}
 		}
 	}
@@ -475,12 +466,12 @@ void *SecopServer::ClientThread(void *obj)
 
 	delete tinfo;
 
-	return NULL;
+	return nullptr;
 }
 
 
 void
-SecopServer::DoInitialize ( UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session )
+SecopServer::DoInitialize ( UnixStreamClientSocketPtr& client, json& cmd, json& session )
 {
 	ScopedLog l("Initialize");
     (void) session;
@@ -489,10 +480,10 @@ SecopServer::DoInitialize ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 		return;
 	}
 
-	if( cmd.isMember("key") && cmd["key"].isString() )
+	if( cmd.contains("key") && cmd["key"].is_string() )
 	{
 		SecVector<byte> sv;
-		Crypto::Base64Decode(cmd["key"].asString(), sv);
+		Crypto::Base64Decode(cmd["key"].get<string>(), sv);
 		try{
 			this->store = CryptoStoragePtr(
 						new CryptoStorage(this->dbpath, sv)
@@ -503,11 +494,11 @@ SecopServer::DoInitialize ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 			return;
 		}
 	}
-	else if( cmd.isMember("pwd") && cmd["pwd"].isString() )
+	else if( cmd.contains("pwd") && cmd["pwd"].is_string() )
 	{
 		try{
 			this->store = CryptoStoragePtr(
-						new CryptoStorage(this->dbpath, SecString(cmd["pwd"].asCString() ) )
+						new CryptoStorage(this->dbpath, SecString(cmd["pwd"].get<string>().c_str()) )
 					);
 		}catch(CryptoPP::Exception& e)
 		{
@@ -532,7 +523,7 @@ SecopServer::~SecopServer ()
 }
 
 void
-SecopServer::DoStatus ( UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session )
+SecopServer::DoStatus ( UnixStreamClientSocketPtr& client, json& cmd, json& session )
 {
 	ScopedLog l("Status");
 
@@ -541,11 +532,11 @@ SecopServer::DoStatus ( UnixStreamClientSocketPtr& client, Json::Value& cmd, Jso
 		return;
 	}
 
-	Json::Value ret(Json::objectValue);
+	json ret;
     ret["server"]["state"]=static_cast<int>(this->state);
 	ret["server"]["api"]=API_VERSION;
 
-	if(session["user"]["authenticated"].asBool() )
+	if(session["user"]["authenticated"].get<bool>() )
 	{
 		ret["server"]["user"]=session["user"]["username"];
 	}
@@ -555,7 +546,7 @@ SecopServer::DoStatus ( UnixStreamClientSocketPtr& client, Json::Value& cmd, Jso
 
 void
 SecopServer::DoAuthenticate ( UnixStreamClientSocketPtr& client,
-		Json::Value& cmd, Json::Value& session )
+		json& cmd, json& session )
 {
 	ScopedLog l("Authenticate");
 
@@ -564,12 +555,12 @@ SecopServer::DoAuthenticate ( UnixStreamClientSocketPtr& client,
 		return;
 	}
 
-	if( !cmd.isMember("type") || !cmd["type"].isString() )
+	if( !cmd.contains("type") || !cmd["type"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 4, "Missing argument");
 		return;
 	}
-	string type = cmd["type"].asString();
+	string type = cmd["type"].get<string>();
 	if( type == "socket")
 	{
 		struct ucred uc = client->GetCredentials();
@@ -581,19 +572,19 @@ SecopServer::DoAuthenticate ( UnixStreamClientSocketPtr& client,
 	}
 	else if( type == "plain")
 	{
-		if( !cmd.isMember("username") || !cmd["username"].isString() )
+		if( !cmd.contains("username") || !cmd["username"].is_string() )
 		{
 			this->SendErrorMessage(client, cmd, 2, "Missing argument");
 			return;
 		}
-		if( !cmd.isMember("password") || !cmd["password"].isString() )
+		if( !cmd.contains("password") || !cmd["password"].is_string() )
 		{
 			this->SendErrorMessage(client, cmd, 2, "Missing argument");
 			return;
 		}
 
-		string user = cmd["username"].asString();
-		SecString pwd = cmd["password"].asCString();
+		string user = cmd["username"].get<string>();
+		SecString pwd = cmd["password"].get<string>().c_str();
 
 		if( !this->store->HasUser( user ) )
 		{
@@ -607,23 +598,24 @@ SecopServer::DoAuthenticate ( UnixStreamClientSocketPtr& client,
 			return;
 		}
 
-		Json::Value ids = this->store->GetIdentifiers(user ,OPIUSER);
+		json ids = this->store->GetIdentifiers(user ,OPIUSER);
 
-		if( ids.size()== 0 || !ids.isArray() )
+		if( ids.size()== 0 || !ids.is_array() )
 		{
 			this->SendErrorMessage(client, cmd, 2, "Database error");
 			return;
 		}
 
-        Json::Value id = ids[static_cast<Json::Value::UInt>(0)];
+		//json id = ids[static_cast<json::UInt>(0)];
+		json id = ids[0];
 
-		if( !id.isMember("password"))
+		if( !id.contains("password"))
 		{
 			this->SendErrorMessage(client, cmd, 2, "Database error");
 			return;
 		}
 
-		if( id["password"].asCString() != pwd)
+		if( id["password"].get<string>().c_str() != pwd)
 		{
 			this->SendErrorMessage(client, cmd, 2, "Authentication error");
 			return;
@@ -642,8 +634,8 @@ SecopServer::DoAuthenticate ( UnixStreamClientSocketPtr& client,
 }
 
 void
-SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
-		Json::Value& session )
+SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, json& cmd,
+		json& session )
 {
 	ScopedLog l("Create user");
 
@@ -652,25 +644,25 @@ SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 		return;
 	}
 
-	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "createuser") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].get<string>(), "createuser") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
-	if( !cmd.isMember("password") || !cmd["password"].isString() )
+	if( !cmd.contains("password") || !cmd["password"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
 
-	string user = cmd["username"].asString();
-	SecString pwd = cmd["password"].asCString();
+	string user = cmd["username"].get<string>();
+	SecString pwd = cmd["password"].get<string>().c_str();
 	string displayname;
 
-	if( cmd.isMember("displayname") || cmd["displayname"].isString() )
+	if( cmd.contains("displayname") || cmd["displayname"].is_string() )
 	{
-		displayname = cmd["displayname"].asString();
+		displayname = cmd["displayname"].get<string>();
 	}
 
 	if( this->store->HasUser(user) )
@@ -684,7 +676,7 @@ SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 	this->store->AddAcl(user, OPIUSER, "root");
 	this->store->AddAcl(user, OPIUSER, user);
 
-	Json::Value id(Json::objectValue);
+	json id;
 	id["password"]=pwd.c_str();
 	this->store->AddIdentifier(user, OPIUSER, id);
 
@@ -692,8 +684,8 @@ SecopServer::DoCreateUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 }
 
 void
-SecopServer::DoRemoveUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
-		Json::Value& session )
+SecopServer::DoRemoveUser ( UnixStreamClientSocketPtr& client, json& cmd,
+		json& session )
 {
 	ScopedLog l("Remove user");
 
@@ -702,13 +694,13 @@ SecopServer::DoRemoveUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 		return;
 	}
 
-	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removeuser") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].get<string>(), "removeuser") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
-	string user = cmd["username"].asString();
+	string user = cmd["username"].get<string>();
 
 	if( !this->store->HasUser( user ) )
 	{
@@ -730,7 +722,7 @@ SecopServer::DoRemoveUser ( UnixStreamClientSocketPtr& client, Json::Value& cmd,
 
 }
 
-void SecopServer::DoUpdatePassword(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoUpdatePassword(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Update password");
 
@@ -739,9 +731,9 @@ void SecopServer::DoUpdatePassword(UnixStreamClientSocketPtr &client, Json::Valu
 		return;
 	}
 
-	string user = cmd["username"].asString();
-	string pwd  = cmd["password"].asString();
-	string actor = session["user"]["username"].asString();
+	string user = cmd["username"].get<string>();
+	string pwd  = cmd["password"].get<string>();
+	string actor = session["user"]["username"].get<string>();
 
 	// Self or admin
 	if( ( actor != user) && ! this->IsAdmin(actor) )
@@ -763,12 +755,12 @@ void SecopServer::DoUpdatePassword(UnixStreamClientSocketPtr &client, Json::Valu
 		return;
 	}
 
-	Json::Value newids(Json::arrayValue);
+	json newids;
 
-	Json::Value newpd;
+	json newpd;
 	newpd["password"] = pwd;
 
-	newids.append(newpd);
+	newids.push_back(newpd);
 
 	this->store->UpdateIdentifiers(user, OPIUSER, newids);
 
@@ -776,7 +768,7 @@ void SecopServer::DoUpdatePassword(UnixStreamClientSocketPtr &client, Json::Valu
 }
 
 void
-SecopServer::DoGetUsers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+SecopServer::DoGetUsers(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Who is allowed to do this?
 	ScopedLog l("Get users");
@@ -789,17 +781,17 @@ SecopServer::DoGetUsers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Jso
 
 	vector<string> users = this->store->GetUsers();
 
-	Json::Value ret(Json::objectValue);
-	ret["users"]=Json::arrayValue;
+	json ret;
+	ret["users"]=json::array();
 
-	for( auto user: users )
+	for( const auto& user: users )
 	{
-		ret["users"].append(user);
+		ret["users"].push_back(user);
 	}
 	this->SendOK(client, cmd, ret);
 }
 
-void SecopServer::DoGetUserGroups(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGetUserGroups(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Get user groups");
     (void) session;
@@ -809,21 +801,21 @@ void SecopServer::DoGetUserGroups(UnixStreamClientSocketPtr &client, Json::Value
 		return;
 	}
 
-	string user = cmd["username"].asString();
+	string user = cmd["username"].get<string>();
 
-	Json::Value ret(Json::objectValue);
-	ret["groups"]=Json::arrayValue;
+	json ret;
+	ret["groups"]=json::array();
 
 	vector<string> groups = this->GetUserGroups(user);
 	for(const string& group: groups)
 	{
-			ret["groups"].append( group );
+			ret["groups"].push_back( group );
 	}
 
 	this->SendOK(client, cmd, ret);
 }
 
-void SecopServer::DoAddAttribute(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoAddAttribute(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Access control!
 	ScopedLog l("Add Attribute");
@@ -834,7 +826,7 @@ void SecopServer::DoAddAttribute(UnixStreamClientSocketPtr &client, Json::Value 
 		return;
 	}
 
-	string user = cmd["username"].asString();
+	string user = cmd["username"].get<string>();
 
 	if( ! this->store->HasUser(user) )
 	{
@@ -842,27 +834,27 @@ void SecopServer::DoAddAttribute(UnixStreamClientSocketPtr &client, Json::Value 
 		return;
 	}
 
-	if( !cmd.isMember("attribute") || !cmd["attribute"].isString() )
+	if( !cmd.contains("attribute") || !cmd["attribute"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
 
-	if( !cmd.isMember("value") || !cmd["value"].isString() )
+	if( !cmd.contains("value") || !cmd["value"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
 
-	string attribute = cmd["attribute"].asString();
-	string value = cmd["value"].asString();
+	string attribute = cmd["attribute"].get<string>();
+	string value = cmd["value"].get<string>();
 
 	this->store->AddAttribute(user, attribute, value );
 
 	this->SendOK(client, cmd);
 }
 
-void SecopServer::DoRemoveAttribute(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoRemoveAttribute(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Access control!
 	ScopedLog l("Remove Attribute");
@@ -873,7 +865,7 @@ void SecopServer::DoRemoveAttribute(UnixStreamClientSocketPtr &client, Json::Val
 		return;
 	}
 
-	string user = cmd["username"].asString();
+	string user = cmd["username"].get<string>();
 
 	if( ! this->store->HasUser(user) )
 	{
@@ -881,13 +873,13 @@ void SecopServer::DoRemoveAttribute(UnixStreamClientSocketPtr &client, Json::Val
 		return;
 	}
 
-	if( !cmd.isMember("attribute") || !cmd["attribute"].isString() )
+	if( !cmd.contains("attribute") || !cmd["attribute"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
 
-	string attribute = cmd["attribute"].asString();
+	string attribute = cmd["attribute"].get<string>();
 
 	if( !this->store->HasAttribute(user, attribute ) )
 	{
@@ -900,7 +892,7 @@ void SecopServer::DoRemoveAttribute(UnixStreamClientSocketPtr &client, Json::Val
 	this->SendOK(client, cmd);
 }
 
-void SecopServer::DoGetAttributes(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGetAttributes(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Access control!
 	ScopedLog l("get Attributes");
@@ -911,7 +903,7 @@ void SecopServer::DoGetAttributes(UnixStreamClientSocketPtr &client, Json::Value
 		return;
 	}
 
-	string user = cmd["username"].asString();
+	string user = cmd["username"].get<string>();
 
 	if( ! this->store->HasUser(user) )
 	{
@@ -921,16 +913,16 @@ void SecopServer::DoGetAttributes(UnixStreamClientSocketPtr &client, Json::Value
 
 	vector<string> attrs = this->store->GetAttributes(user);
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 
-	for( auto attr: attrs )
+	for( const auto& attr: attrs )
 	{
-		ret["attributes"].append(attr);
+		ret["attributes"].push_back(attr);
 	}
 	this->SendOK(client, cmd, ret);
 }
 
-void SecopServer::DoGetAttribute(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGetAttribute(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Access control!
 	ScopedLog l("Get Attribute");
@@ -941,7 +933,7 @@ void SecopServer::DoGetAttribute(UnixStreamClientSocketPtr &client, Json::Value 
 		return;
 	}
 
-	string user = cmd["username"].asString();
+	string user = cmd["username"].get<string>();
 
 	if( ! this->store->HasUser(user) )
 	{
@@ -949,13 +941,13 @@ void SecopServer::DoGetAttribute(UnixStreamClientSocketPtr &client, Json::Value 
 		return;
 	}
 
-	if( !cmd.isMember("attribute") || !cmd["attribute"].isString() )
+	if( !cmd.contains("attribute") || !cmd["attribute"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
 
-	string attribute = cmd["attribute"].asString();
+	string attribute = cmd["attribute"].get<string>();
 
 	if( ! this->store->HasAttribute(user, attribute ) )
 	{
@@ -963,14 +955,14 @@ void SecopServer::DoGetAttribute(UnixStreamClientSocketPtr &client, Json::Value 
 		return;
 	}
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 	ret["attribute"] = this->store->GetAttribute(user,attribute);
 
 	this->SendOK(client, cmd, ret);
 }
 
 void
-SecopServer::DoGetServices(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+SecopServer::DoGetServices(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Access control!
 	//TODO: Howto handle opiuser service?
@@ -983,20 +975,20 @@ SecopServer::DoGetServices(UnixStreamClientSocketPtr &client, Json::Value &cmd, 
 		return;
 	}
 
-	vector<string> services = this->store->GetServices(cmd["username"].asString());
+	vector<string> services = this->store->GetServices(cmd["username"].get<string>());
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 
-	for( auto service: services )
+	for( const auto& service: services )
 	{
-		ret["services"].append(service);
+		ret["services"].push_back(service);
 	}
 
 	this->SendOK(client, cmd, ret);
 }
 
 void
-SecopServer::DoAddService(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+SecopServer::DoAddService(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Access control!
 	//TODO: Howto handle opiuser service?
@@ -1009,8 +1001,8 @@ SecopServer::DoAddService(UnixStreamClientSocketPtr &client, Json::Value &cmd, J
 		return;
 	}
 
-	string user = cmd["username"].asString();
-	string service = cmd["servicename"].asString();
+	string user = cmd["username"].get<string>();
+	string service = cmd["servicename"].get<string>();
 
 	if( ! this->store->HasUser(user) )
 	{
@@ -1030,7 +1022,7 @@ SecopServer::DoAddService(UnixStreamClientSocketPtr &client, Json::Value &cmd, J
 }
 
 void
-SecopServer::DoRemoveService(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+SecopServer::DoRemoveService(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 
 	ScopedLog l("Remove service");
@@ -1040,8 +1032,8 @@ SecopServer::DoRemoveService(UnixStreamClientSocketPtr &client, Json::Value &cmd
 		return;
 	}
 
-	string user = cmd["username"].asString();
-	string service = cmd["servicename"].asString();
+	string user = cmd["username"].get<string>();
+	string service = cmd["servicename"].get<string>();
 
 	if( ! this->store->HasUser(user) )
 	{
@@ -1056,10 +1048,10 @@ SecopServer::DoRemoveService(UnixStreamClientSocketPtr &client, Json::Value &cmd
 	}
 
 	/* Check if user is allowed to bypass acl-check */
-	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removeservice" ) )
+	if( ! this->AdminOrAllowed(session["user"]["username"].get<string>(), "removeservice" ) )
 	{
 		/* Only allowed to remove if no ACL or mentioned in ACL */
-		if ( ! this->store->ACLEmpty(user, service) && ! this->store->HasACL(user, service, session["user"]["username"].asString() ) )
+		if ( ! this->store->ACLEmpty(user, service) && ! this->store->HasACL(user, service, session["user"]["username"].get<string>() ) )
 		{
 			this->SendErrorMessage(client, cmd, 4, "Not allowed");
 			return;
@@ -1073,7 +1065,7 @@ SecopServer::DoRemoveService(UnixStreamClientSocketPtr &client, Json::Value &cmd
 
 
 void
-SecopServer::DoGetACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
+SecopServer::DoGetACL(UnixStreamClientSocketPtr& client, json& cmd, json& session)
 {
 	ScopedLog l("Get ACL");
     (void) session;
@@ -1083,8 +1075,8 @@ SecopServer::DoGetACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 		return;
 	}
 
-	string user = cmd["username"].asString();
-	string service = cmd["servicename"].asString();
+	string user = cmd["username"].get<string>();
+	string service = cmd["servicename"].get<string>();
 
 	if( !this->store->HasUser( user ) )
 	{
@@ -1100,19 +1092,19 @@ SecopServer::DoGetACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 
 	vector<string> acls = this->store->GetACL(user, service );
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 
-	ret["acl"] = Json::Value(Json::arrayValue);
+	ret["acl"] = json::array();
 
-	for( auto acl: acls )
+	for( const auto& acl: acls )
 	{
-		ret["acl"].append(acl);
+		ret["acl"].push_back(acl);
 	}
 	this->SendOK(client, cmd, ret);
 }
 
 void
-SecopServer::DoAddACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
+SecopServer::DoAddACL(UnixStreamClientSocketPtr& client, json& cmd, json& session)
 {
 	//TODO: Access control!
 	ScopedLog l("Add ACL");
@@ -1122,14 +1114,14 @@ SecopServer::DoAddACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 		return;
 	}
 
-	if( !cmd.isMember("acl") || !cmd["acl"].isString() )
+	if( !cmd.contains("acl") || !cmd["acl"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
-	string user = cmd["username"].asString();
-	string service = cmd["servicename"].asString();
-	string acl = cmd["acl"].asString();
+	string user = cmd["username"].get<string>();
+	string service = cmd["servicename"].get<string>();
+	string acl = cmd["acl"].get<string>();
 
 	if( !this->store->HasUser( user ) )
 	{
@@ -1157,9 +1149,9 @@ SecopServer::DoAddACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 
 	if( ! this->store->ACLEmpty(user, service) )
 	{
-		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		if ( ! this->store->HasACL(user, service, session["user"]["username"].get<string>() )  )
 		{
-			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "addacl") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].get<string>() , "addacl") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1173,7 +1165,7 @@ SecopServer::DoAddACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 }
 
 void
-SecopServer::DoRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
+SecopServer::DoRemoveACL(UnixStreamClientSocketPtr& client, json& cmd, json& session)
 {
 	//TODO: Access control!
 	ScopedLog l("Remove ACL");
@@ -1183,15 +1175,15 @@ SecopServer::DoRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Js
 		return;
 	}
 
-	if( !cmd.isMember("acl") || !cmd["acl"].isString() )
+	if( !cmd.contains("acl") || !cmd["acl"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
 
-	string user = cmd["username"].asString();
-	string service = cmd["servicename"].asString();
-	string acl = cmd["acl"].asString();
+	string user = cmd["username"].get<string>();
+	string service = cmd["servicename"].get<string>();
+	string acl = cmd["acl"].get<string>();
 
 	if( !this->store->HasUser( user ) )
 	{
@@ -1216,9 +1208,9 @@ SecopServer::DoRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Js
 	 *   Policy disallows user to always remove ACLs
 	 */
 
-	if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+	if ( ! this->store->HasACL(user, service, session["user"]["username"].get<string>() )  )
 	{
-		if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "removeacl") )
+		if ( ! this->AdminOrAllowed(session["user"]["username"].get<string>() , "removeacl") )
 		{
 			this->SendErrorMessage(client, cmd, 4, "Not allowed");
 			return;
@@ -1231,7 +1223,7 @@ SecopServer::DoRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Js
 }
 
 void
-SecopServer::DoHasACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
+SecopServer::DoHasACL(UnixStreamClientSocketPtr& client, json& cmd, json& session)
 {
 	ScopedLog l("Has ACL");
     (void) session;
@@ -1241,14 +1233,14 @@ SecopServer::DoHasACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 		return;
 	}
 
-	if( !cmd.isMember("acl") || !cmd["acl"].isString() )
+	if( !cmd.contains("acl") || !cmd["acl"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
-	string user = cmd["username"].asString();
-	string service = cmd["servicename"].asString();
-	string acl = cmd["acl"].asString();
+	string user = cmd["username"].get<string>();
+	string service = cmd["servicename"].get<string>();
+	string acl = cmd["acl"].get<string>();
 
 	if( !this->store->HasUser( user ) )
 	{
@@ -1262,14 +1254,14 @@ SecopServer::DoHasACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json:
 		return;
 	}
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 	ret["hasacl"] = this->store->HasACL(user, service, acl);
 
 	this->SendOK(client, cmd, ret);
 }
 
 void
-SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
+SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, json& cmd, json& session)
 {
 	//TODO: Access control!
 
@@ -1280,8 +1272,8 @@ SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd
 		return;
 	}
 
-	string user = cmd["username"].asString();
-	string service = cmd["servicename"].asString();
+	string user = cmd["username"].get<string>();
+	string service = cmd["servicename"].get<string>();
 
 	if( ! this->store->HasUser(user) )
 	{
@@ -1295,7 +1287,7 @@ SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd
 		return;
 	}
 
-	if( !cmd.isMember("identifier") || !cmd["identifier"].isObject() )
+	if( !cmd.contains("identifier") || !cmd["identifier"].is_object() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
 		return;
@@ -1308,9 +1300,9 @@ SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd
 
 	if( ! this->store->ACLEmpty(user, service) )
 	{
-		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		if ( ! this->store->HasACL(user, service, session["user"]["username"].get<string>() )  )
 		{
-			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "addidentifier") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].get<string>() , "addidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1324,7 +1316,7 @@ SecopServer::DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd
 }
 
 void
-SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session)
+SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, json& cmd, json& session)
 {
 
 	ScopedLog l("Remove identifier");
@@ -1334,8 +1326,8 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 		return;
 	}
 
-	string user = cmd["username"].asString();
-	string service = cmd["servicename"].asString();
+	string user = cmd["username"].get<string>();
+	string service = cmd["servicename"].get<string>();
 
 	if( ! this->store->HasUser(user) )
 	{
@@ -1349,7 +1341,7 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 		return;
 	}
 
-	if( !cmd.isMember("identifier") || !cmd["identifier"].isObject() )
+	if( !cmd.contains("identifier") || !cmd["identifier"].is_object() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
 		return;
@@ -1362,9 +1354,9 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 
 	if( ! this->store->ACLEmpty(user, service) )
 	{
-		if ( ! this->store->HasACL(user, service, session["user"]["username"].asString() )  )
+		if ( ! this->store->HasACL(user, service, session["user"]["username"].get<string>() )  )
 		{
-			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "removeidentifier") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].get<string>() , "removeidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1375,16 +1367,16 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 	bool id_hasname = false, id_hasservice = false;
 	string id_name, id_service;
 
-	if( cmd["identifier"].isMember("user") && cmd["identifier"]["user"].isString() )
+	if( cmd["identifier"].contains("user") && cmd["identifier"]["user"].is_string() )
 	{
 		id_hasname = true;
-		id_name = cmd["identifier"]["user"].asString();
+		id_name = cmd["identifier"]["user"].get<string>();
 	}
 
-	if( cmd["identifier"].isMember("service") && cmd["identifier"]["service"].isString() )
+	if( cmd["identifier"].contains("service") && cmd["identifier"]["service"].is_string() )
 	{
 		id_hasservice = true;
-		id_service = cmd["identifier"]["service"].asString();
+		id_service = cmd["identifier"]["service"].get<string>();
 	}
 
 	if( !id_hasname && !id_hasservice )
@@ -1393,20 +1385,20 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 		return;
 	}
 
-	Json::Value ids = this->store->GetIdentifiers(user, service);
-	Json::Value new_ids(Json::arrayValue);
+	json ids = this->store->GetIdentifiers(user, service);
+	json new_ids = json::array();
 	for( auto id: ids)
 	{
 		bool match_user = false, match_service=false;
 
-		if( id.isMember("user") && id["user"].isString() && id_hasname )
+		if( id.contains("user") && id["user"].is_string() && id_hasname )
 		{
-			match_user = ( id["user"].asString() == id_name );
+			match_user = ( id["user"].get<string>() == id_name );
 		}
 
-		if( id.isMember("service") && id["service"].isString() && id_hasservice )
+		if( id.contains("service") && id["service"].is_string() && id_hasservice )
 		{
-			match_service = ( id["service"].asString() == id_service );
+			match_service = ( id["service"].get<string>() == id_service );
 		}
 
 		// Todo: there has to be a more clever way
@@ -1425,7 +1417,7 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 		else
 		{
 			// Not found, append to new list
-			new_ids.append( id );
+			new_ids.push_back( id );
 		}
 	}
 
@@ -1434,7 +1426,7 @@ SecopServer::DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& 
 	this->SendOK(client, cmd);
 }
 
-void SecopServer::DoGroupAdd(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGroupAdd(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Add group");
 
@@ -1443,19 +1435,19 @@ void SecopServer::DoGroupAdd(UnixStreamClientSocketPtr &client, Json::Value &cmd
 		return;
 	}
 
-	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "addgroup") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].get<string>(), "addgroup") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
-	string group = cmd["group"].asString();
+	string group = cmd["group"].get<string>();
 	this->store->GroupAdd(group);
 
 	this->SendOK(client, cmd);
 }
 
-void SecopServer::DoGroupsGet(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGroupsGet(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Get groups");
     (void) session;
@@ -1470,17 +1462,17 @@ void SecopServer::DoGroupsGet(UnixStreamClientSocketPtr &client, Json::Value &cm
 
 	vector<string> groups = this->store->GroupsGet();
 
-	Json::Value ret(Json::objectValue);
-	ret["groups"]=Json::arrayValue;
-	for(auto group: groups)
+	json ret;
+	ret["groups"];
+	for(const auto& group: groups)
 	{
-		ret["groups"].append(group);
+		ret["groups"].push_back(group);
 	}
 
 	this->SendOK(client, cmd, ret);
 }
 
-void SecopServer::DoGroupAddMember(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGroupAddMember(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Add group member");
 
@@ -1489,21 +1481,21 @@ void SecopServer::DoGroupAddMember(UnixStreamClientSocketPtr &client, Json::Valu
 		return;
 	}
 
-	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "addgroupmember") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].get<string>(), "addgroupmember") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
-	string group = cmd["group"].asString();
-	string member = cmd["member"].asString();
+	string group = cmd["group"].get<string>();
+	string member = cmd["member"].get<string>();
 
 	this->store->GroupAddMember(group, member);
 
 	this->SendOK(client, cmd);
 }
 
-void SecopServer::DoGroupRemoveMember(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGroupRemoveMember(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Remove group member");
 
@@ -1512,14 +1504,14 @@ void SecopServer::DoGroupRemoveMember(UnixStreamClientSocketPtr &client, Json::V
 		return;
 	}
 
-	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removegroupmember") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].get<string>(), "removegroupmember") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
-	string group = cmd["group"].asString();
-	string member = cmd["member"].asString();
+	string group = cmd["group"].get<string>();
+	string member = cmd["member"].get<string>();
 
 	this->store->GroupRemoveMember(group, member);
 
@@ -1527,7 +1519,7 @@ void SecopServer::DoGroupRemoveMember(UnixStreamClientSocketPtr &client, Json::V
 
 }
 
-void SecopServer::DoGroupGetMembers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGroupGetMembers(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Get group members");
     (void) session;
@@ -1539,21 +1531,21 @@ void SecopServer::DoGroupGetMembers(UnixStreamClientSocketPtr &client, Json::Val
 
 	//Todo: Should we have any policy on this?
 
-	string group = cmd["group"].asString();
+	string group = cmd["group"].get<string>();
 
 	vector<string> members = this->store->GroupGetMembers(group);
 
-	Json::Value ret(Json::objectValue);
-	ret["members"]=Json::arrayValue;
-	for(auto member: members)
+	json ret;
+	ret["members"];
+	for( const auto& member: members)
 	{
-		ret["members"].append(member);
+		ret["members"].push_back(member);
 	}
 
 	this->SendOK(client, cmd, ret);
 }
 
-void SecopServer::DoGroupRemove(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGroupRemove(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Remove group");
 
@@ -1562,13 +1554,13 @@ void SecopServer::DoGroupRemove(UnixStreamClientSocketPtr &client, Json::Value &
 		return;
 	}
 
-	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removegroup") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].get<string>(), "removegroup") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
-	string group = cmd["group"].asString();
+	string group = cmd["group"].get<string>();
 
 	// Sanity check, we don't allow users to remove admin group
 	if( group == "admin" )
@@ -1582,7 +1574,7 @@ void SecopServer::DoGroupRemove(UnixStreamClientSocketPtr &client, Json::Value &
 	this->SendOK(client, cmd);
 }
 
-void SecopServer::DoCreateAppID(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoCreateAppID(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Create appid");
 
@@ -1591,13 +1583,13 @@ void SecopServer::DoCreateAppID(UnixStreamClientSocketPtr &client, Json::Value &
 		return;
 	}
 
-	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "createappid") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].get<string>(), "createappid") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
-	string appid = cmd["appid"].asString();
+	string appid = cmd["appid"].get<string>();
 
 	if( this->store->HasAppID( appid ) )
 	{
@@ -1611,7 +1603,7 @@ void SecopServer::DoCreateAppID(UnixStreamClientSocketPtr &client, Json::Value &
 
 }
 
-void SecopServer::DoGetAppIDs(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoGetAppIDs(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Get appids");
     (void) session;
@@ -1623,17 +1615,17 @@ void SecopServer::DoGetAppIDs(UnixStreamClientSocketPtr &client, Json::Value &cm
 
 	vector<string> appids = this->store->GetAppIDs();
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 
-	for( auto appid: appids )
+	for( const auto& appid: appids )
 	{
-		ret["appids"].append(appid);
+		ret["appids"].push_back(appid);
 	}
 	this->SendOK(client, cmd, ret);
 
 }
 
-void SecopServer::DoRemoveAppID(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoRemoveAppID(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Remove appid");
 
@@ -1642,13 +1634,13 @@ void SecopServer::DoRemoveAppID(UnixStreamClientSocketPtr &client, Json::Value &
 		return;
 	}
 
-	if( ! this->AdminOrAllowed(session["user"]["username"].asString(), "removeappid") )
+	if( ! this->AdminOrAllowed(session["user"]["username"].get<string>(), "removeappid") )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Not allowed");
 		return;
 	}
 
-	string appid = cmd["appid"].asString();
+	string appid = cmd["appid"].get<string>();
 
 	if( !this->store->HasAppID( appid ) )
 	{
@@ -1661,7 +1653,7 @@ void SecopServer::DoRemoveAppID(UnixStreamClientSocketPtr &client, Json::Value &
 	this->SendOK(client, cmd);
 }
 
-void SecopServer::DoAppGetIdentifiers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoAppGetIdentifiers(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Access control!
 
@@ -1672,7 +1664,7 @@ void SecopServer::DoAppGetIdentifiers(UnixStreamClientSocketPtr &client, Json::V
 		return;
 	}
 
-	string appid = cmd["appid"].asString();
+	string appid = cmd["appid"].get<string>();
 
 	if( ! this->store->HasAppID(appid) )
 	{
@@ -1683,20 +1675,20 @@ void SecopServer::DoAppGetIdentifiers(UnixStreamClientSocketPtr &client, Json::V
 	/* Todo, add policy check */
 	// Not empty and user not in ACL
 	if( ! this->store->AppACLEmpty(appid) &&
-			! this->store->AppHasACL( appid, session["user"]["username"].asString() ) &&
-			! this->AdminOrAllowed(session["user"]["username"].asString(), "getappidentifiers") )
+			! this->store->AppHasACL( appid, session["user"]["username"].get<string>() ) &&
+			! this->AdminOrAllowed(session["user"]["username"].get<string>(), "getappidentifiers") )
 	{
 		this->SendErrorMessage(client, cmd, 4, "Access not allowed");
 		return;
 	}
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 	ret["identifiers"] = this->store->AppGetIdentifiers( appid );
 
 	this->SendOK(client, cmd, ret);
 }
 
-void SecopServer::DoAppAddIdentifier(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoAppAddIdentifier(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Add app identifier");
 
@@ -1705,7 +1697,7 @@ void SecopServer::DoAppAddIdentifier(UnixStreamClientSocketPtr &client, Json::Va
 		return;
 	}
 
-	string appid = cmd["appid"].asString();
+	string appid = cmd["appid"].get<string>();
 
 	if( ! this->store->HasAppID( appid) )
 	{
@@ -1714,7 +1706,7 @@ void SecopServer::DoAppAddIdentifier(UnixStreamClientSocketPtr &client, Json::Va
 	}
 
 
-	if( !cmd.isMember("identifier") || !cmd["identifier"].isObject() )
+	if( !cmd.contains("identifier") || !cmd["identifier"].is_object() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
 		return;
@@ -1727,9 +1719,9 @@ void SecopServer::DoAppAddIdentifier(UnixStreamClientSocketPtr &client, Json::Va
 
 	if( ! this->store->AppACLEmpty(appid) )
 	{
-		if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
+		if ( ! this->store->AppHasACL(appid, session["user"]["username"].get<string>() )  )
 		{
-			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "addappidentifier") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].get<string>() , "addappidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1743,7 +1735,7 @@ void SecopServer::DoAppAddIdentifier(UnixStreamClientSocketPtr &client, Json::Va
 
 }
 
-void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Remove identifier");
 
@@ -1752,7 +1744,7 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 		return;
 	}
 
-	string appid = cmd["appid"].asString();
+	string appid = cmd["appid"].get<string>();
 
 	if( ! this->store->HasAppID( appid) )
 	{
@@ -1760,7 +1752,7 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 		return;
 	}
 
-	if( !cmd.isMember("identifier") || !cmd["identifier"].isObject() )
+	if( !cmd.contains("identifier") || !cmd["identifier"].is_object() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing or malformed argument");
 		return;
@@ -1773,9 +1765,9 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 
 	if( ! this->store->AppACLEmpty( appid ) )
 	{
-		if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
+		if ( ! this->store->AppHasACL(appid, session["user"]["username"].get<string>() )  )
 		{
-			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "removeappidentifier") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].get<string>() , "removeappidentifier") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1783,9 +1775,9 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 		}
 	}
 
-	Json::Value needle = cmd["identifier"];
-	Json::Value ids = this->store->AppGetIdentifiers( appid );
-	Json::Value new_ids(Json::arrayValue);
+	json needle = cmd["identifier"];
+	json ids = this->store->AppGetIdentifiers( appid );
+	json new_ids= json::array();
 
 	bool id_removed = false;
 	// For each identifier for appid
@@ -1795,14 +1787,13 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 
 		//For each key/value in search arg
 
-		Json::Value::Members ms = needle.getMemberNames();
 
-		for( auto m: ms)
+		for( const auto& m: needle.items())
 		{
 			// Member exists in current identifier?
-			if( id.isMember( m ) )
+			if( id.contains( m.key() ) )
 			{
-				if( id[m].asString() == needle[m].asString() )
+				if( id[m.key() ].get<string>() == m.value().get<string>() )
 				{
 					// Found match!
 					found = true;
@@ -1814,7 +1805,7 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 		if( ! found )
 		{
 			// Not found, append to new list
-			new_ids.append( id );
+			new_ids.push_back( id );
 		}
 	}
 
@@ -1830,7 +1821,7 @@ void SecopServer::DoAppRemoveIdentifier(UnixStreamClientSocketPtr &client, Json:
 	}
 }
 
-void SecopServer::DoAppAddACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoAppAddACL(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 
 	ScopedLog l("Add app ACL");
@@ -1840,13 +1831,13 @@ void SecopServer::DoAppAddACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 		return;
 	}
 
-	if( !cmd.isMember("acl") || !cmd["acl"].isString() )
+	if( !cmd.contains("acl") || !cmd["acl"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
-	string appid = cmd["appid"].asString();
-	string acl = cmd["acl"].asString();
+	string appid = cmd["appid"].get<string>();
+	string acl = cmd["acl"].get<string>();
 
 	if( acl == "" )
 	{
@@ -1874,9 +1865,9 @@ void SecopServer::DoAppAddACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 
 	if( ! this->store->AppACLEmpty( appid ) )
 	{
-		if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
+		if ( ! this->store->AppHasACL(appid, session["user"]["username"].get<string>() )  )
 		{
-			if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "appaddacl") )
+			if ( ! this->AdminOrAllowed(session["user"]["username"].get<string>() , "appaddacl") )
 			{
 				this->SendErrorMessage(client, cmd, 4, "Not allowed");
 				return;
@@ -1890,7 +1881,7 @@ void SecopServer::DoAppAddACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 
 }
 
-void SecopServer::DoAppGetACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoAppGetACL(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Get app ACL");
     (void) session;
@@ -1900,7 +1891,7 @@ void SecopServer::DoAppGetACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 		return;
 	}
 
-	string appid = cmd["appid"].asString();
+	string appid = cmd["appid"].get<string>();
 
 	if( !this->store->HasAppID( appid ) )
 	{
@@ -1911,18 +1902,18 @@ void SecopServer::DoAppGetACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 
 	vector<string> acls = this->store->AppGetACL( appid );
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 
-	ret["acl"] = Json::Value(Json::arrayValue);
+	ret["acl"] = json::array();
 
-	for( auto acl: acls )
+	for( const auto& acl: acls )
 	{
-		ret["acl"].append(acl);
+		ret["acl"].push_back(acl);
 	}
 	this->SendOK(client, cmd, ret);
 }
 
-void SecopServer::DoAppRemoveACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoAppRemoveACL(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Access control!
 	ScopedLog l("Remove app ACL");
@@ -1932,14 +1923,14 @@ void SecopServer::DoAppRemoveACL(UnixStreamClientSocketPtr &client, Json::Value 
 		return;
 	}
 
-	if( !cmd.isMember("acl") || !cmd["acl"].isString() )
+	if( !cmd.contains("acl") || !cmd["acl"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
 
-	string appid = cmd["appid"].asString();
-	string acl = cmd["acl"].asString();
+	string appid = cmd["appid"].get<string>();
+	string acl = cmd["acl"].get<string>();
 
 	if( !this->store->HasAppID( appid ) )
 	{
@@ -1958,9 +1949,9 @@ void SecopServer::DoAppRemoveACL(UnixStreamClientSocketPtr &client, Json::Value 
 	 *   Policy disallows user to always remove ACLs
 	 */
 
-	if ( ! this->store->AppHasACL(appid, session["user"]["username"].asString() )  )
+	if ( ! this->store->AppHasACL(appid, session["user"]["username"].get<string>() )  )
 	{
-		if ( ! this->AdminOrAllowed(session["user"]["username"].asString() , "removeappacl") )
+		if ( ! this->AdminOrAllowed(session["user"]["username"].get<string>() , "removeappacl") )
 		{
 			this->SendErrorMessage(client, cmd, 4, "Not allowed");
 			return;
@@ -1973,7 +1964,7 @@ void SecopServer::DoAppRemoveACL(UnixStreamClientSocketPtr &client, Json::Value 
 
 }
 
-void SecopServer::DoAppHasACL(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+void SecopServer::DoAppHasACL(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	ScopedLog l("Has app ACL");
     (void) session;
@@ -1983,13 +1974,13 @@ void SecopServer::DoAppHasACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 		return;
 	}
 
-	if( !cmd.isMember("acl") || !cmd["acl"].isString() )
+	if( !cmd.contains("acl") || !cmd["acl"].is_string() )
 	{
 		this->SendErrorMessage(client, cmd, 2, "Missing argument");
 		return;
 	}
-	string appid = cmd["appid"].asString();
-	string acl = cmd["acl"].asString();
+	string appid = cmd["appid"].get<string>();
+	string acl = cmd["acl"].get<string>();
 
 	if( !this->store->HasAppID( appid ) )
 	{
@@ -1997,7 +1988,7 @@ void SecopServer::DoAppHasACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 		return;
 	}
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 	ret["hasacl"] = this->store->AppHasACL(appid, acl);
 
 	this->SendOK(client, cmd, ret);
@@ -2005,7 +1996,7 @@ void SecopServer::DoAppHasACL(UnixStreamClientSocketPtr &client, Json::Value &cm
 }
 
 void
-SecopServer::DoGetIdentifiers(UnixStreamClientSocketPtr &client, Json::Value &cmd, Json::Value &session)
+SecopServer::DoGetIdentifiers(UnixStreamClientSocketPtr &client, json &cmd, json &session)
 {
 	//TODO: Access control!
 
@@ -2016,8 +2007,8 @@ SecopServer::DoGetIdentifiers(UnixStreamClientSocketPtr &client, Json::Value &cm
 		return;
 	}
 
-	string user = cmd["username"].asString();
-	string service = cmd["servicename"].asString();
+	string user = cmd["username"].get<string>();
+	string service = cmd["servicename"].get<string>();
 
 	if( ! this->store->HasUser(user) )
 	{
@@ -2034,14 +2025,14 @@ SecopServer::DoGetIdentifiers(UnixStreamClientSocketPtr &client, Json::Value &cm
 	/* Todo, add policy check */
 	// Not empty and user not in ACL
 	if( ! this->store->ACLEmpty(user, service) &&
-			! this->store->HasACL(user, service, session["user"]["username"].asString() ) &&
-			! this->AdminOrAllowed(session["user"]["username"].asString(), "getidentifiers") )
+			! this->store->HasACL(user, service, session["user"]["username"].get<string>() ) &&
+			! this->AdminOrAllowed(session["user"]["username"].get<string>(), "getidentifiers") )
 	{
 		this->SendErrorMessage(client, cmd, 4, "Access not allowed");
 		return;
 	}
 
-	Json::Value ret(Json::objectValue);
+	json ret;
 	ret["identifiers"] = this->store->GetIdentifiers( user, service );
 
 	this->SendOK(client, cmd, ret);

@@ -15,13 +15,16 @@
 #include <libutils/NetServer.h>
 #include <libutils/Mutex.h>
 
-#include "json/json.h"
+#include <nlohmann/json.hpp>
+
 #include "CryptoStorage.h"
 
 #include "Config.h"
 
 using namespace std;
 using namespace Utils::Net;
+
+using json = nlohmann::json;
 
 #define API_VERSION 1.0
 
@@ -53,81 +56,81 @@ class SecopServer : public Utils::Net::NetServer
 {
 public:
 
-	SecopServer (const string& socketpath, const string& dbpath);
+	SecopServer (const string& socketpath, string  dbpath);
 
 	virtual void Dispatch(SocketPtr con);
 
 	virtual	~SecopServer ();
 protected:
-	void ProcessOneCommand(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void SendReply(UnixStreamClientSocketPtr& client, Json::Value& cmd);
+	void ProcessOneCommand(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void SendReply(UnixStreamClientSocketPtr& client, json& cmd);
 
-	void DoInitialize(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoStatus(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoAuthenticate(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoInitialize(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoStatus(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoAuthenticate(UnixStreamClientSocketPtr& client, json& cmd, json& session);
 
-	void DoCreateUser(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoRemoveUser(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoUpdatePassword(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGetUsers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGetUserGroups(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoCreateUser(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoRemoveUser(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoUpdatePassword(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGetUsers(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGetUserGroups(UnixStreamClientSocketPtr& client, json& cmd, json& session);
 
-	void DoAddAttribute(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoRemoveAttribute(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGetAttributes(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGetAttribute(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-
-
-	void DoGetServices(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoAddService(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoRemoveService(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-
-	void DoGetACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoAddACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoHasACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-
-	void DoGetIdentifiers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-
-	void DoGroupAdd(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGroupsGet(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGroupAddMember(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGroupRemoveMember(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGroupGetMembers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGroupRemove(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoAddAttribute(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoRemoveAttribute(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGetAttributes(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGetAttribute(UnixStreamClientSocketPtr& client, json& cmd, json& session);
 
 
-	void DoCreateAppID(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoGetAppIDs(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoRemoveAppID(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGetServices(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoAddService(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoRemoveService(UnixStreamClientSocketPtr& client, json& cmd, json& session);
 
-	void DoAppGetIdentifiers(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoAppAddIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoAppRemoveIdentifier(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGetACL(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoAddACL(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoRemoveACL(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoHasACL(UnixStreamClientSocketPtr& client, json& cmd, json& session);
 
-	void DoAppAddACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoAppGetACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoAppRemoveACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
-	void DoAppHasACL(UnixStreamClientSocketPtr& client, Json::Value& cmd, Json::Value& session);
+	void DoGetIdentifiers(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoAddIdentifier(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoRemoveIdentifier(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+
+	void DoGroupAdd(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGroupsGet(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGroupAddMember(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGroupRemoveMember(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGroupGetMembers(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGroupRemove(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+
+
+	void DoCreateAppID(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoGetAppIDs(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoRemoveAppID(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+
+	void DoAppGetIdentifiers(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoAppAddIdentifier(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoAppRemoveIdentifier(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+
+	void DoAppAddACL(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoAppGetACL(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoAppRemoveACL(UnixStreamClientSocketPtr& client, json& cmd, json& session);
+	void DoAppHasACL(UnixStreamClientSocketPtr& client, json& cmd, json& session);
 
 private:
-	bool CheckArguments(UnixStreamClientSocketPtr& client, int what,const Json::Value& cmd);
-	static bool CheckAPIVersion(const Json::Value& cmd);
-	static bool CheckTID(const Json::Value& cmd);
-	static bool CheckUsername(const Json::Value& cmd);
-	static bool CheckPassword(const Json::Value &cmd);
-	static bool CheckService(const Json::Value& cmd);
-	static bool CheckAppID(const Json::Value &cmd);
-	static bool CheckGroup(const Json::Value &cmd);
-	static bool CheckMember(const Json::Value &cmd);
+	bool CheckArguments(UnixStreamClientSocketPtr& client, int what,const json& cmd);
+	static bool CheckAPIVersion(const json& cmd);
+	static bool CheckTID(const json& cmd);
+	static bool CheckUsername(const json& cmd);
+	static bool CheckPassword(const json &cmd);
+	static bool CheckService(const json& cmd);
+	static bool CheckAppID(const json &cmd);
+	static bool CheckGroup(const json &cmd);
+	static bool CheckMember(const json &cmd);
 
 	bool IsAdmin(const string& user);
 	bool AdminOrAllowed(const string& user, const string& policy);
 
-	void SendErrorMessage(UnixStreamClientSocketPtr& client, const Json::Value& cmd, int errcode, const string& msg);
-	void SendOK(UnixStreamClientSocketPtr& client, const Json::Value& cmd, const Json::Value& val = Json::nullValue);
+	void SendErrorMessage(UnixStreamClientSocketPtr& client, const json& cmd, int errcode, const string& msg);
+	void SendOK(UnixStreamClientSocketPtr& client, const json& cmd, const json& val = json());
 
 	vector<string> GetUserGroups(const string& user);
 
@@ -139,9 +142,7 @@ private:
 	CryptoStoragePtr store;
 	string dbpath;
 
-    unique_ptr<Json::StreamWriter> writer;
-
-    typedef void (SecopServer::*Action)(UnixStreamClientSocketPtr&, Json::Value&, Json::Value&);
+	typedef void (SecopServer::*Action)(UnixStreamClientSocketPtr&, json&, json&);
 	map<string,pair<unsigned char, Action>> actions;
 };
 

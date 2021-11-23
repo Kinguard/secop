@@ -14,5 +14,5 @@ include_directories(
 add_definitions( -std=c++11 -Wall )
 add_executable( testsecop ${testsecop_src} )
 
-target_link_libraries( testsecop applib jsoncpplib ${CPPUNIT_LDFLAGS} ${LIBCRYPTO++_LDFLAGS} ${LIBUTILS_LDFLAGS})
+target_link_libraries( testsecop applib ${CPPUNIT_LDFLAGS} ${LIBCRYPTO++_LDFLAGS} ${LIBUTILS_LDFLAGS})
 
