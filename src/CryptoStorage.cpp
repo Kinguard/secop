@@ -842,7 +842,13 @@ vector<string> CryptoStorage::GetAttributes(const string &username)
 	{
 		throw std::runtime_error("User not found");
 	}
-	return vector<string>(this->data["user"][username]["attributes"].begin(),this->data["user"][username]["attributes"].end());
+
+	vector<string> ret;
+	for(const auto& attr : this->data["user"][username]["attributes"].items() )
+	{
+		ret.push_back(attr.key() );
+	}
+	return ret;
 }
 
 string CryptoStorage::GetAttribute(const string &username, const string &attributename)

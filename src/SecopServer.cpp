@@ -217,7 +217,7 @@ SecopServer::SendReply ( UnixStreamClientSocketPtr& client, json& val )
 inline bool
 SecopServer::CheckAPIVersion ( const json& cmd )
 {
-	return !cmd.is_null() && cmd.contains("version") && cmd["version"].is_number_integer() && (cmd["version"].get<double>() == API_VERSION);
+	return !cmd.is_null() && cmd.contains("version") && cmd["version"].is_number() && (cmd["version"].get<double>() == API_VERSION);
 }
 
 inline bool
