@@ -1,3 +1,14 @@
+secop (0.53) vigrid; urgency=medium
+
+  * Fix GetAttributes which wrongly returned attribute values
+  * Fix CheckAPIVersion which wrongly validated input
+  * Fix CheckAPIVersion
+  * Remove lingering local jsoncpp copy
+  * Misc cleaning and linting
+  * Bullseye adaptations
+
+ -- Tor Krill <tor@openproducts.se>  Tue, 01 Feb 2022 17:00:13 +0100
+
 secop (0.52) vili; urgency=medium
 
   * Rebuild
